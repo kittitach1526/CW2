@@ -24,6 +24,7 @@ export default function GangDashboard() {
 
   const [editingFileId, setEditingFileId] = useState<number | null>(null);
   const [newUrlInput, setNewUrlInput] = useState("");
+  const [reasonInput, setReasonInput] = useState("");
 
   // 1. ดึงข้อมูลแก๊งจาก localStorage เมื่อเข้าสู่ระบบ
   useEffect(() => {
@@ -138,14 +139,16 @@ export default function GangDashboard() {
 
   const handleUpdateLinkSubmit = async (id: number) => {
     if (!newUrlInput.trim()) return alert("❌ กรุณากรอก URL ไฟล์ชุดใหม่");
+    if (!reasonInput.trim()) return alert("❌ กรุณากรอกเหตุผลการเปลี่ยนลิงก์ไฟล์ชุด");
     setLoading(true);
-    const result = await updateUniformFileLink(id, newUrlInput);
+    const result = await updateUniformFileLink(id, newUrlInput, reasonInput);
     setLoading(false);
 
     alert(result.message);
     if (result.success) {
       setEditingFileId(null);
       setNewUrlInput("");
+      setReasonInput("");
       loadUniformFiles();
     }
   };
@@ -374,6 +377,10 @@ export default function GangDashboard() {
                   <label className="text-sm font-medium text-zinc-200">เลข Discord ผู้อนุมัติ</label>
                   <input type="text" name="approverDiscord" placeholder="เช่น 9874561230123456" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-teal-400 focus:outline-none text-sm" required />
                 </div>
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <label className="text-sm font-medium text-zinc-200">เหตุผล / หมายเหตุ (ถ้ามี)</label>
+                  <input type="text" name="reason" placeholder="เช่น แก้ไขลิงก์เดิมเสีย หรืออัปเดตชุดใหม่" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-teal-400 focus:outline-none text-sm" />
+                </div>
               </div>
               <button type="submit" disabled={loading} className="w-full h-12 mt-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 font-semibold text-white hover:opacity-90 transition-all disabled:opacity-50">
                 {loading ? "กำลังบันทึกข้อมูล..." : "💾 บันทึกและส่งเรื่องเพิ่มไฟล์ชุด"}
@@ -392,6 +399,7 @@ export default function GangDashboard() {
                       <th className="px-4 py-3">รายละเอียดชุด</th>
                       <th className="px-4 py-3">ลิงก์ดาวน์โหลด</th>
                       <th className="px-4 py-3">สถานะระบบ</th>
+                      <th className="px-4 py-3">เหตุผล</th>
                       <th className="px-4 py-3">ผู้เซ็นอนุมัติ</th>
                       <th className="px-4 py-3">วันที่ส่งเรื่อง</th>
                       <th className="px-4 py-3 text-center">จัดการลิงก์ไฟล์</th>
@@ -399,7 +407,7 @@ export default function GangDashboard() {
                   </thead>
                   <tbody>
                     {uniformFiles.length === 0 ? (
-                      <tr><td colSpan={6} className="text-center py-8 text-zinc-500">❌ ไม่พบประวัติข้อมูลไฟล์ชุดในระบบสภากลาง</td></tr>
+                      <tr><td colSpan={7} className="text-center py-8 text-zinc-500">❌ ไม่พบประวัติข้อมูลไฟล์ชุดในระบบสภากลาง</td></tr>
                     ) : (
                       uniformFiles.map((file) => (
                         <tr key={file.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
@@ -417,19 +425,21 @@ export default function GangDashboard() {
                               {file.status === "ลงแล้ว" ? "✅ ลงแล้ว" : "⏳ รอลง"}
                             </span>
                           </td>
+                          <td className="px-4 py-3 text-zinc-300 text-xs max-w-[160px] truncate">{file.reason || "-"}</td>
                           <td className="px-4 py-3 text-zinc-300 text-xs">{file.approver}</td>
                           <td className="px-4 py-3 text-zinc-400 text-xs font-mono">{file.createdAt}</td>
                           <td className="px-4 py-3 text-center">
                             {editingFileId === file.id ? (
-                              <div className="flex flex-col gap-1.5 min-w-[200px] bg-zinc-900/90 p-2 rounded-lg border border-white/10">
+                              <div className="flex flex-col gap-1.5 min-w-[220px] bg-zinc-900/90 p-2 rounded-lg border border-white/10">
                                 <input type="url" value={newUrlInput} onChange={(e) => setNewUrlInput(e.target.value)} placeholder="วางลิงก์ไฟล์ .zip ตัวใหม่" className="w-full h-8 px-2 rounded bg-zinc-950 border border-white/20 text-xs text-white focus:outline-none" />
+                                <input type="text" value={reasonInput} onChange={(e) => setReasonInput(e.target.value)} placeholder="ระบุเหตุผลการเปลี่ยนลิงก์" className="w-full h-8 px-2 rounded bg-zinc-950 border border-white/20 text-xs text-white focus:outline-none" required />
                                 <div className="flex justify-center gap-1">
                                   <button onClick={() => handleUpdateLinkSubmit(file.id)} disabled={loading} className="px-2 py-0.5 bg-green-600 hover:bg-green-500 text-[10px] rounded text-white font-medium">บันทึก</button>
-                                  <button onClick={() => { setEditingFileId(null); setNewUrlInput(""); }} className="px-2 py-0.5 bg-zinc-700 hover:bg-zinc-600 text-[10px] rounded text-zinc-300">ยกเลิก</button>
+                                  <button onClick={() => { setEditingFileId(null); setNewUrlInput(""); setReasonInput(""); }} className="px-2 py-0.5 bg-zinc-700 hover:bg-zinc-600 text-[10px] rounded text-zinc-300">ยกเลิก</button>
                                 </div>
                               </div>
                             ) : (
-                              <button onClick={() => { setEditingFileId(file.id); setNewUrlInput(file.fileUrl); }} className="px-3 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-medium rounded-lg transition-all">
+                              <button onClick={() => { setEditingFileId(file.id); setNewUrlInput(file.fileUrl); setReasonInput(file.reason || ""); }} className="px-3 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-medium rounded-lg transition-all">
                                 🔄 เปลี่ยนลิงก์ไฟล์
                               </button>
                             )}

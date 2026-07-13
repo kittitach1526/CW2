@@ -147,13 +147,14 @@ export async function loginGang(formData: FormData) {
   }
 }
 
-// ➕ ปรับปรุง Action: บันทึกไฟล์ชุดโดยรับรายละเอียดประเภทชุดเพิ่ม และกำหนดสถานะเริ่มต้นเป็น "รอลง"
+// ➕ ปรับปรุง Action: บันทึกไฟล์ชุดโดยรับรายละเอียดประเภทชุดและเหตุผลเพิ่ม และกำหนดสถานะเริ่มต้นเป็น "รอลง"
 export async function createUniformFile(formData: FormData) {
   const gangName = formData.get("gangName") as string;
   const uniformType = formData.get("uniformType") as string; // 👈 ดึงค่าว่าคือชุดอะไรเพิ่มเข้ามา
   const fileUrl = formData.get("fileUrl") as string;
   const approver = formData.get("approver") as string;
   const approverDiscord = formData.get("approverDiscord") as string;
+  const reason = formData.get("reason") as string | null;
 
   if (!gangName || !uniformType || !fileUrl || !approver || !approverDiscord) {
     return { success: false, message: "❌ กรุณากรอกข้อมูลไฟล์ชุดให้ครบถ้วน" };
@@ -169,6 +170,7 @@ export async function createUniformFile(formData: FormData) {
         fileUrl,
         approver,
         approverDiscord,
+        reason: reason || null, // 👈 บันทึกเหตุผล (ถ้ามี)
         status: "รอลง", // 👈 ตั้งค่าเริ่มต้นเป็น "รอลง" ให้แอดมินมาจัดการภายหลัง
         createdAt: thaiNow,
       },
@@ -195,9 +197,13 @@ export async function getAllUniformFiles() {
 }
 
 // ➕ Action ใหม่สำหรับกด "อัปเดต/เปลี่ยนลิงก์ไฟล์ชุด" จากฝั่งผู้ใช้ หน้าแดชบอร์ดแก๊ง
-export async function updateUniformFileLink(id: number, newFileUrl: string) {
+export async function updateUniformFileLink(id: number, newFileUrl: string, reason: string) {
   if (!newFileUrl) {
     return { success: false, message: "❌ กรุณากรอกลิงก์ไฟล์ใหม่" };
+  }
+
+  if (!reason || !reason.trim()) {
+    return { success: false, message: "❌ กรุณากรอกเหตุผลการเปลี่ยนลิงก์ไฟล์ชุด" };
   }
 
   try {
@@ -205,10 +211,11 @@ export async function updateUniformFileLink(id: number, newFileUrl: string) {
       where: { id },
       data: { 
         fileUrl: newFileUrl,
+        reason: reason.trim(),
         status: "รอลง" // 🔄 เมื่อยูสเซอร์เปลี่ยนไฟล์ชุดแล้ว ให้รีเซ็ตกลับเป็น "รอลง" เพื่อให้แอดมินตรวจเช็กและลงใหม่อีกครั้ง
       },
     });
-    return { success: true, message: "🔄 อัปเดตลิงก์ไฟล์ชุดใหม่ และส่งเรื่องให้แอดมินตรวจสอบแล้ว!" };
+    return { success: true, message: "🔄 อัปเดตลิงก์ไฟล์ชุดใหม่ พร้อมเหตุผลเรียบร้อย ส่งเรื่องให้แอดมินตรวจสอบแล้ว!" };
   } catch (error) {
     console.error(error);
     return { success: false, message: "❌ ไม่สามารถอัปเดตไฟล์ชุดได้" };

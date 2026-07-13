@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   getAllUniformFiles,
-  updateUniformFileLink,
+  updateUniformStatus,
 } from "../register";
 
 export default function CouncilAdminDashboard() {
@@ -99,10 +99,7 @@ export default function CouncilAdminDashboard() {
       const targetFile = uniformFiles.find((file) => file.id === id);
       if (!targetFile) return;
 
-      const res = await updateUniformFileLink(id, {
-          fileUrl: targetFile.fileUrl, 
-          status: status               
-        });
+      const res = await updateUniformStatus(id, status);
       
       if (res && res.success) {
         alert(`✨ อัปเดตสถานะชุดโมเดล ID: #${id} ในฐานข้อมูลเรียบร้อย`);
@@ -291,13 +288,14 @@ export default function CouncilAdminDashboard() {
                           <th className="px-6 py-4">โมเดลชุด</th>
                           <th className="px-6 py-4">สังกัดแก๊ง</th>
                           <th className="px-6 py-4">ลิงก์ทรัพยากร</th>
+                          <th className="px-6 py-4">เหตุผล</th>
                           <th className="px-6 py-4">สถานะ</th>
                           <th className="px-6 py-4 text-center">อัปเดตเมือง</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/[0.04] text-zinc-300">
                         {uniformFiles.length === 0 ? (
-                          <tr><td colSpan={5} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีรายงานไฟล์โมเดลชุดเครื่องแบบเข้ามาในระบบ</td></tr>
+                          <tr><td colSpan={6} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีรายงานไฟล์โมเดลชุดเครื่องแบบเข้ามาในระบบ</td></tr>
                         ) : (
                           uniformFiles.map((file) => (
                             <tr key={file.id} className="hover:bg-white/[0.01] transition-colors">
@@ -306,6 +304,7 @@ export default function CouncilAdminDashboard() {
                               <td className="px-6 py-4">
                                 <a href={file.fileUrl} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white underline underline-offset-4 transition-colors font-medium">📥 Download File</a>
                               </td>
+                              <td className="px-6 py-4 text-zinc-400 max-w-[200px] truncate">{file.reason || "-"}</td>
                               <td className="px-6 py-4">
                                 <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${file.status === "ลงแล้ว" ? "bg-white/[0.08] text-white border-white/[0.1]" : "bg-white/[0.01] text-zinc-500 border-white/[0.04]"}`}>
                                   {file.status === "ลงแล้ว" ? "✓ เมืองรับแล้ว" : "⏳ รอการอิมพอร์ต"}

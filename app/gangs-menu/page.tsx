@@ -80,7 +80,7 @@ export default function Home() {
             </div>
           </Link>
 
-          {/* 3. สำหรับ Admin */}
+          {/* 3. สำหรับ Admin
           <Link
             href="/admin-dashboard"
             className="group flex flex-col items-center sm:items-start gap-3 p-6 rounded-2xl bg-white/5 border border-white/10 text-white transition-all duration-300 hover:bg-gradient-to-br hover:from-purple-600/30 hover:to-pink-600/30 hover:border-purple-400/50 hover:scale-[1.02] active:scale-[0.98] shadow-lg text-center sm:text-left"
@@ -94,7 +94,7 @@ export default function Home() {
               <h3 className="text-lg font-bold">Welfare</h3>
               <p className="text-xs text-zinc-300/80 mt-1 font-light">สำหรับผู้ดูแลระบบและจัดการโครงสร้างทั้งหมด</p>
             </div>
-          </Link>
+          </Link> */}
 
         </div>
       </main>

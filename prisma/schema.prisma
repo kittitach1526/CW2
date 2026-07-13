@@ -37,6 +37,7 @@ model UniformFile {
   fileUrl          String   
   approver         String   
   approverDiscord  String   
+  reason           String?  // ➕ เหตุผลการเปลี่ยน/อัปเดต URL ไฟล์ชุด
   status           String   @default("รอลง") // ➕ เพิ่ม: สถานะเบื้องต้น (รอลง / ลงแล้ว) ล็อกไว้ให้แอดมินแก้ทีหลัง
   createdAt        String   
 }
