@@ -67,7 +67,18 @@ export default function Home() {
               <input type="password" name="password" placeholder="••••••••" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" required />
             </div>
 
-            {/* 4. สีประจำกลุ่ม (รองรับทั้งการพิมพ์รหัส HEX และการกดจิ้มเลือกสี) */}
+            {/* 4. ประเภทแก๊ง */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-zinc-200">ประเภทแก๊ง</label>
+              <select name="type" className="w-full h-11 px-4 rounded-xl bg-zinc-900 border border-white/10 text-sm text-white focus:border-blue-400 focus:outline-none" required>
+                <option value="">-- เลือกประเภทแก๊ง --</option>
+                <option value="Family">Family</option>
+                <option value="Gang">Gang</option>
+                <option value="Gangs-LD">Gangs-LD</option>
+              </select>
+            </div>
+
+            {/* 5. สีประจำกลุ่ม (รองรับทั้งการพิมพ์รหัส HEX และการกดจิ้มเลือกสี) */}
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-zinc-200">สีประจำกลุ่ม (Color Theme)</label>
               <div className="relative flex items-center gap-2">

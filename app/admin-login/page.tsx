@@ -4,10 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation"; 
 import { loginAdmin } from "../register"; // 👈 เปลี่ยนมานำเข้า loginAdmin สำหรับแอดมินโดยเฉพาะ
+import StatusModal from "../components/StatusModal";
 
 export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter(); 
+  const [statusModal, setStatusModal] = useState<{ open: boolean; type: "success" | "error"; message: string }>({
+    open: false,
+    type: "success",
+    message: "",
+  });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); 
@@ -19,20 +25,24 @@ export default function AdminLoginPage() {
       // 🚀 เรียกใช้งาน Server Action ของ Admin ที่ปรับปรุงตาม Model
       const result = await loginAdmin(formData);
       
-      alert(result.message);
+      setStatusModal({ open: true, type: result.success ? "success" : "error", message: result.message });
 
       if (result.success && result.admin) {
         // 💾 บันทึกสิทธิ์ผู้ดูแลระบบลงใน Browser
         localStorage.setItem("currentAdmin", JSON.stringify(result.admin));
-        
-        // ➡️ ส่งต่อไปยังหน้าจอ Dashboard หลักของแอดมิน
-        router.push("/admin-dashboard"); 
       }
     } catch (error) {
       console.error(error);
-      alert("❌ เกิดข้อผิดพลาดในการเชื่อมต่อระบบหน้าบ้านแอดมิน");
+      setStatusModal({ open: true, type: "error", message: "❌ เกิดข้อผิดพลาดในการเชื่อมต่อระบบหน้าบ้านแอดมิน" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleModalClose = () => {
+    setStatusModal((prev) => ({ ...prev, open: false }));
+    if (statusModal.type === "success") {
+      router.push("/admin-dashboard");
     }
   };
 
@@ -102,6 +112,14 @@ export default function AdminLoginPage() {
 
         </form>
       </main>
+
+      <StatusModal
+        open={statusModal.open}
+        type={statusModal.type}
+        title={statusModal.type === "success" ? "เข้าสู่ระบบสำเร็จ" : "เข้าสู่ระบบไม่สำเร็จ"}
+        message={statusModal.message}
+        onClose={handleModalClose}
+      />
     </div>
   );
 }

@@ -24,6 +24,32 @@ model Gang {
   status           String   @default("pending")
   createdAt        String   
   logoUrl          String?  
+  editReason       String?  // ➕ เหตุผลการแก้ไขข้อมูลแก๊ง
+  type             String   @default("Gang") // ➕ ประเภทแก๊ง (Gang / Family / Gangs-LD)
+  editRequests     GangEditRequest[]
+  disbandRequest   DisbandRequest?
+}
+
+model GangEditRequest {
+  id               Int      @id @default(autoincrement())
+  gangId           Int
+  gang             Gang     @relation(fields: [gangId], references: [id], onDelete: Cascade)
+  fullName         String
+  abbreviation     String
+  colorTheme       String
+  leader           String
+  leaderDiscord    String
+  coLeader1        String?
+  coLeader1Discord String?
+  coLeader2        String?
+  coLeader2Discord String?
+  type             String
+  editReason       String?
+  newPassword      String?  // ➕ รหัสผ่านใหม่ (ถ้ามีการขอเปลี่ยน)
+  status           String   @default("pending")
+  createdAt        String
+  reviewedAt       String?
+  reviewer         String?
 }
 
 // (โมเดล Gang เดิมของคุณ...)
@@ -42,6 +68,17 @@ model UniformFile {
   createdAt        String   
 }
 
+
+model DisbandRequest {
+  id        Int    @id @default(autoincrement())
+  gangId    Int    @unique
+  gang      Gang   @relation(fields: [gangId], references: [id], onDelete: Cascade)
+  reason    String?
+  status    String @default("pending")
+  createdAt String
+  reviewedAt String?
+  reviewer  String?
+}
 
 model WelfareRequest {
   id               Int      @id @default(autoincrement())

@@ -4,10 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation"; // 👈 นำเข้า Router เพื่อใช้เปลี่ยนหน้า
 import { loginCouncil } from "../register"; // 👈 นำเข้า Server Action จากไฟล์ actions ของคุณ
+import StatusModal from "../components/StatusModal";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const router = useRouter(); // 👈 เรียกใช้งาน Router
+  const [statusModal, setStatusModal] = useState<{ open: boolean; type: "success" | "error"; message: string }>({
+    open: false,
+    type: "success",
+    message: "",
+  });
 
   // 🔥 ปรับเปลี่ยนฟังก์ชันมาใช้ onSubmit ของ Form แทนเพื่อความเสถียรในการย้ายหน้า
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -21,20 +27,24 @@ export default function Home() {
       // เรียกใช้ Server Action ตรวจสอบข้อมูลในฐานข้อมูล SQLite
       const result = await loginCouncil(formData);
       
-      alert(result.message);
+      setStatusModal({ open: true, type: result.success ? "success" : "error", message: result.message });
 
       if (result.success && result.council) {
         // 💾 1. สั่งบันทึกข้อมูลสภาลงใน Browser (localStorage)
         localStorage.setItem("currentCouncil", JSON.stringify(result.council));
-        
-        // 🚀 2. ส่งผู้ใช้ไปยังหน้า Dashboard ของสภาทันที
-        router.push("/council-dashboard"); 
       }
     } catch (error) {
       console.error(error);
-      alert("❌ เกิดข้อผิดพลาดในการเชื่อมต่อระบบระบบหน้าบ้าน");
+      setStatusModal({ open: true, type: "error", message: "❌ เกิดข้อผิดพลาดในการเชื่อมต่อระบบระบบหน้าบ้าน" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleModalClose = () => {
+    setStatusModal((prev) => ({ ...prev, open: false }));
+    if (statusModal.type === "success") {
+      router.push("/council-dashboard");
     }
   };
 
@@ -89,6 +99,14 @@ export default function Home() {
 
         </form>
       </main>
+
+      <StatusModal
+        open={statusModal.open}
+        type={statusModal.type}
+        title={statusModal.type === "success" ? "เข้าสู่ระบบสำเร็จ" : "เข้าสู่ระบบไม่สำเร็จ"}
+        message={statusModal.message}
+        onClose={handleModalClose}
+      />
     </div>
   );
 }

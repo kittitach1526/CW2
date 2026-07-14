@@ -3,23 +3,119 @@
 
 import { db } from "../lib/db"; // 👈 เช็ก path ตรงนี้ให้ดีว่ามองเห็นไฟล์ db.ts แล้ว
 
-// ➕ Action สำหรับเปลี่ยนสถานะใน Model Gang เป็น "รอยุบ"
-export async function requestDisbandGang(abbreviation: string) {
+// ➕ Action สำหรับส่งคำขอยุบแก๊ง (ไม่อัปเดตสถานะทันที รอสภาอนุมัติ)
+export async function requestDisbandGang(abbreviation: string, reason?: string) {
   try {
     if (!abbreviation) {
       return { success: false, message: "❌ ไม่พบข้อมูลชื่อย่อแก๊ง" };
     }
 
-    // อัปเดตสถานะในฐานข้อมูลเป็น "รอยุบ"
-    await db.gang.update({
-      where: { abbreviation: abbreviation },
-      data: { status: "รอยุบ" }
+    const gang = await db.gang.findUnique({ where: { abbreviation } });
+    if (!gang) {
+      return { success: false, message: "❌ ไม่พบแก๊งในระบบ" };
+    }
+
+    const existing = await db.disbandRequest.findUnique({
+      where: { gangId: gang.id },
     });
 
-    return { success: true, message: "⚠️ ส่งเรื่องขอยุบแก๊งไปยังระบบสภากลางเรียบร้อยแล้ว สถานะปัจจุบัน: รอยุบ" };
+    if (existing && existing.status === "pending") {
+      return { success: false, message: "⏳ คำขอยุบแก๊งนี้กำลังรอการอนุมัติจากสภากลางอยู่แล้ว" };
+    }
+
+    const thaiNow = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Bangkok" });
+
+    await db.disbandRequest.upsert({
+      where: { gangId: gang.id },
+      update: { status: "pending", reason: reason || null, createdAt: thaiNow, reviewedAt: null, reviewer: null },
+      create: { gangId: gang.id, reason: reason || null, status: "pending", createdAt: thaiNow },
+    });
+
+    return { success: true, message: "⚠️ ส่งเรื่องขอยุบแก๊งไปยังระบบสภากลางเรียบร้อยแล้ว กรุณารอสภาพิจารณา" };
   } catch (error) {
     console.error("Disband Gang Error:", error);
     return { success: false, message: "❌ เกิดข้อผิดพลาดในระบบฐานข้อมูล" };
+  }
+}
+
+// ดึงคำขอยุบแก๊งที่รออนุมัติทั้งหมด
+export async function getPendingDisbandRequests() {
+  try {
+    const requests = await db.disbandRequest.findMany({
+      where: { status: "pending" },
+      include: {
+        gang: {
+          select: { id: true, fullName: true, abbreviation: true, leader: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return { success: true, requests };
+  } catch (error) {
+    console.error("Get Pending Disband Requests Error:", error);
+    return { success: false, requests: [] };
+  }
+}
+
+// ดึงคำขอยุบแก๊งของแก๊งนั้นๆ
+export async function getDisbandRequestByGang(gangId: number) {
+  try {
+    const request = await db.disbandRequest.findUnique({
+      where: { gangId },
+    });
+    return { success: true, request };
+  } catch (error) {
+    console.error("Get Disband Request Error:", error);
+    return { success: false, request: null };
+  }
+}
+
+// อนุมัติคำขอยุบแก๊ง
+export async function approveDisbandRequest(id: number, reviewer: string) {
+  try {
+    const request = await db.disbandRequest.findUnique({ where: { id } });
+    if (!request || request.status !== "pending") {
+      return { success: false, message: "❌ ไม่พบคำขอ หรือคำขอนี้ถูกดำเนินการไปแล้ว" };
+    }
+
+    const thaiNow = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Bangkok" });
+
+    await db.gang.update({
+      where: { id: request.gangId },
+      data: { status: "รอยุบ" },
+    });
+
+    await db.disbandRequest.update({
+      where: { id },
+      data: { status: "approved", reviewer, reviewedAt: thaiNow },
+    });
+
+    return { success: true, message: "✅ อนุมัติคำขอยุบแก๊งแล้ว สถานะแก๊งเปลี่ยนเป็น 'รอยุบ'" };
+  } catch (error) {
+    console.error("Approve Disband Request Error:", error);
+    return { success: false, message: "❌ เกิดข้อผิดพลาดในการอนุมัติคำขอยุบแก๊ง" };
+  }
+}
+
+// ปฏิเสธคำขอยุบแก๊ง
+export async function rejectDisbandRequest(id: number, reviewer: string) {
+  try {
+    const request = await db.disbandRequest.findUnique({ where: { id } });
+    if (!request || request.status !== "pending") {
+      return { success: false, message: "❌ ไม่พบคำขอ หรือคำขอนี้ถูกดำเนินการไปแล้ว" };
+    }
+
+    const thaiNow = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Bangkok" });
+
+    await db.disbandRequest.update({
+      where: { id },
+      data: { status: "rejected", reviewer, reviewedAt: thaiNow },
+    });
+
+    return { success: true, message: "✕ ปฏิเสธคำขอยุบแก๊งแล้ว" };
+  } catch (error) {
+    console.error("Reject Disband Request Error:", error);
+    return { success: false, message: "❌ เกิดข้อผิดพลาดในการปฏิเสธคำขอ" };
   }
 }
 
@@ -29,6 +125,7 @@ export async function createRegistration(formData: FormData) {
   const password = formData.get("password") as string;
   const colorTheme = formData.get("colorTheme") as string;
   const logoUrl = formData.get("logoUrl") as string; 
+  const type = formData.get("type") as string;
   
   // ➕ ดึงค่า Discord ID ของหัวหน้าและรองทั้ง 2 คนเพิ่มเข้ามาจากหน้าฟอร์ม
   const leader = formData.get("leader") as string;
@@ -41,7 +138,7 @@ export async function createRegistration(formData: FormData) {
   const approver = formData.get("approver") as string;
 
   // 1. ตรวจสอบว่ากรอกฟิลด์ที่จำเป็นครบถ้วนหรือไม่ (เพิ่มตรวจสอบเลขดิสคอร์ดของหัวหน้าด้วย)
-  if (!fullName || !abbreviation || !password || !leader || !leaderDiscord || !approver) {
+  if (!fullName || !abbreviation || !password || !type || !leader || !leaderDiscord || !approver) {
     return { success: false, message: "❌ กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน" };
   }
 
@@ -65,22 +162,23 @@ export async function createRegistration(formData: FormData) {
         abbreviation,
         password,
         colorTheme,
-        logoUrl: logoUrl || null, 
-        
+        logoUrl: logoUrl || null,
+        type,
+
         // บันทึกข้อมูลหัวหน้า + ดิสคอร์ด
         leader,
-        leaderDiscord, 
-        
+        leaderDiscord,
+
         // บันทึกข้อมูลรอง 1 + ดิสคอร์ด (ถ้าว่างใส่ null)
         coLeader1: coLeader1 || null,
         coLeader1Discord: coLeader1Discord || null,
-        
+
         // บันทึกข้อมูลรอง 2 + ดิสคอร์ด (ถ้าว่างใส่ null)
         coLeader2: coLeader2 || null,
         coLeader2Discord: coLeader2Discord || null,
-        
+
         approver,
-        status: "pending", 
+        status: "pending",
         createdAt: thaiNow,
       },
     });
@@ -136,7 +234,7 @@ export async function loginGang(formData: FormData) {
         coLeader1Discord: gang.coLeader1Discord, // ➕ ส่งกลับไป
         coLeader2: gang.coLeader2,
         coLeader2Discord: gang.coLeader2Discord, // ➕ ส่งกลับไป
-        
+        type: gang.type,
         approver: gang.approver,
         status: gang.status
       }
@@ -144,6 +242,176 @@ export async function loginGang(formData: FormData) {
   } catch (error) {
     console.error(error);
     return { success: false, message: "❌ ไม่พบข้อมูล" };
+  }
+}
+
+// ➕ Action สำหรับส่งคำขอแก้ไขข้อมูลแก๊ง (ต้องรอสภาอนุมัติก่อน)
+export async function createGangEditRequest(formData: FormData) {
+  const gangId = Number(formData.get("id"));
+  const fullName = formData.get("fullName") as string;
+  const abbreviation = formData.get("abbreviation") as string;
+  const colorTheme = formData.get("colorTheme") as string;
+  const password = formData.get("password") as string;
+  const leader = formData.get("leader") as string;
+  const leaderDiscord = formData.get("leaderDiscord") as string;
+  const coLeader1 = formData.get("coLeader1") as string;
+  const coLeader1Discord = formData.get("coLeader1Discord") as string;
+  const coLeader2 = formData.get("coLeader2") as string;
+  const coLeader2Discord = formData.get("coLeader2Discord") as string;
+  const editReason = formData.get("editReason") as string;
+  const type = formData.get("type") as string;
+
+  if (!gangId || !fullName || !abbreviation || !leader || !leaderDiscord || !type) {
+    return { success: false, message: "❌ กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน" };
+  }
+
+  try {
+    const existing = await db.gang.findUnique({ where: { id: gangId } });
+    if (!existing) {
+      return { success: false, message: "❌ ไม่พบแก๊งในระบบ" };
+    }
+
+    // ตรวจสอบชื่อย่อไม่ให้ซ้ำกับแก๊งอื่นในระบบ
+    if (abbreviation !== existing.abbreviation) {
+      const taken = await db.gang.findUnique({ where: { abbreviation } });
+      if (taken) {
+        return { success: false, message: "❌ ชื่อย่อแก๊งนี้ถูกใช้งานแล้ว" };
+      }
+    }
+
+    const thaiNow = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Bangkok" });
+
+    const payload = {
+      fullName,
+      abbreviation,
+      colorTheme,
+      leader,
+      leaderDiscord,
+      coLeader1: coLeader1 || null,
+      coLeader1Discord: coLeader1Discord || null,
+      coLeader2: coLeader2 || null,
+      coLeader2Discord: coLeader2Discord || null,
+      type,
+      editReason: editReason || null,
+      newPassword: password ? password.trim() : null,
+    };
+
+    // ถ้ามีคำขอแก้ไขที่กำลังรออยู่ ให้อัปเดตทับแทน
+    const pending = await db.gangEditRequest.findFirst({
+      where: { gangId, status: "pending" },
+    });
+
+    if (pending) {
+      const updated = await db.gangEditRequest.update({
+        where: { id: pending.id },
+        data: { ...payload, createdAt: thaiNow },
+      });
+      return { success: true, message: "📝 อัปเดตคำขอแก้ไขข้อมูลที่รออนุมัติสำเร็จแล้ว", editRequest: updated };
+    }
+
+    const created = await db.gangEditRequest.create({
+      data: { gangId, ...payload, createdAt: thaiNow },
+    });
+
+    return { success: true, message: "📝 ส่งคำขอแก้ไขข้อมูลแก๊งไปยังสภากลางแล้ว กรุณารออนุมัติ", editRequest: created };
+  } catch (error) {
+    console.error("Create Gang Edit Request Error:", error);
+    return { success: false, message: "❌ เกิดข้อผิดพลาดในการส่งคำขอแก้ไขข้อมูล" };
+  }
+}
+
+// ดึงคำขอแก้ไขแก๊งที่รออนุมัติทั้งหมด
+export async function getPendingGangEditRequests() {
+  try {
+    const requests = await db.gangEditRequest.findMany({
+      where: { status: "pending" },
+      include: {
+        gang: {
+          select: { id: true, fullName: true, abbreviation: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return { success: true, requests };
+  } catch (error) {
+    console.error("Get Pending Gang Edit Requests Error:", error);
+    return { success: false, requests: [] };
+  }
+}
+
+// ดึงคำขอแก้ไขล่าสุดของแก๊ง
+export async function getGangEditRequestByGang(gangId: number) {
+  try {
+    const request = await db.gangEditRequest.findFirst({
+      where: { gangId, status: "pending" },
+      orderBy: { createdAt: "desc" },
+    });
+    return { success: true, request };
+  } catch (error) {
+    console.error("Get Gang Edit Request Error:", error);
+    return { success: false, request: null };
+  }
+}
+
+// อนุมัติคำขอแก้ไขแก๊ง
+export async function approveGangEditRequest(id: number, reviewer: string) {
+  try {
+    const request = await db.gangEditRequest.findUnique({ where: { id } });
+    if (!request || request.status !== "pending") {
+      return { success: false, message: "❌ ไม่พบคำขอ หรือคำขอนี้ถูกดำเนินการไปแล้ว" };
+    }
+
+    const thaiNow = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Bangkok" });
+
+    await db.gang.update({
+      where: { id: request.gangId },
+      data: {
+        fullName: request.fullName,
+        abbreviation: request.abbreviation,
+        colorTheme: request.colorTheme,
+        leader: request.leader,
+        leaderDiscord: request.leaderDiscord,
+        coLeader1: request.coLeader1,
+        coLeader1Discord: request.coLeader1Discord,
+        coLeader2: request.coLeader2,
+        coLeader2Discord: request.coLeader2Discord,
+        type: request.type,
+        editReason: request.editReason,
+        ...(request.newPassword ? { password: request.newPassword } : {}),
+      },
+    });
+
+    await db.gangEditRequest.update({
+      where: { id },
+      data: { status: "approved", reviewer, reviewedAt: thaiNow },
+    });
+
+    return { success: true, message: "✅ อนุมัติการแก้ไขข้อมูลแก๊งสำเร็จแล้ว" };
+  } catch (error) {
+    console.error("Approve Gang Edit Request Error:", error);
+    return { success: false, message: "❌ เกิดข้อผิดพลาดในการอนุมัติคำขอ" };
+  }
+}
+
+// ปฏิเสธคำขอแก้ไขแก๊ง
+export async function rejectGangEditRequest(id: number, reviewer: string) {
+  try {
+    const request = await db.gangEditRequest.findUnique({ where: { id } });
+    if (!request || request.status !== "pending") {
+      return { success: false, message: "❌ ไม่พบคำขอ หรือคำขอนี้ถูกดำเนินการไปแล้ว" };
+    }
+
+    const thaiNow = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Bangkok" });
+
+    await db.gangEditRequest.update({
+      where: { id },
+      data: { status: "rejected", reviewer, reviewedAt: thaiNow },
+    });
+
+    return { success: true, message: "✕ ปฏิเสธคำขอแก้ไขข้อมูลแก๊งแล้ว" };
+  } catch (error) {
+    console.error("Reject Gang Edit Request Error:", error);
+    return { success: false, message: "❌ เกิดข้อผิดพลาดในการปฏิเสธคำขอ" };
   }
 }
 
@@ -484,5 +752,163 @@ export async function loginAdmin(formData: FormData) {
   } catch (error) {
     console.error("🚨 ADMIN DATABASE DEBUG ERROR:", error);
     return { success: false, message: "❌ ฐานข้อมูลระบบแอดมินขัดข้อง (ดู Terminal)" };
+  }
+}
+
+// =====================================================================
+// 👑 ROOT / SUPER ADMIN — จัดการบัญชี Council และ Admin ทั้งหมดในระบบ
+// ⚠️ เปลี่ยน username/password เริ่มต้นตรงนี้ก่อนนำระบบไปใช้งานจริง!
+// =====================================================================
+const ROOT_USERNAME = "root";
+const ROOT_PASSWORD = "changeme123";
+
+export async function loginRoot(formData: FormData) {
+  const username = formData.get("username");
+  const password = formData.get("password");
+
+  if (typeof username !== "string" || typeof password !== "string" || !username.trim() || !password.trim()) {
+    return { success: false, message: "❌ กรุณากรอกข้อมูลให้ครบถ้วน" };
+  }
+
+  if (username.trim() !== ROOT_USERNAME || password !== ROOT_PASSWORD) {
+    return { success: false, message: "❌ ชื่อผู้ใช้หรือรหัสผ่านผู้ดูแลสูงสุดไม่ถูกต้อง" };
+  }
+
+  return {
+    success: true,
+    message: "🎉 เข้าสู่ระบบผู้ดูแลสูงสุดสำเร็จ!",
+    root: { username: ROOT_USERNAME },
+  };
+}
+
+export async function getAllCouncilUsers() {
+  try {
+    const users = await db.council.findMany({ orderBy: { id: "desc" } });
+    return { success: true, users };
+  } catch (error) {
+    console.error("Get All Council Users Error:", error);
+    return { success: false, users: [], message: "❌ ไม่สามารถดึงข้อมูลบัญชีสภาได้" };
+  }
+}
+
+export async function getAllAdminUsers() {
+  try {
+    const users = await db.admin.findMany({ orderBy: { id: "desc" } });
+    return { success: true, users };
+  } catch (error) {
+    console.error("Get All Admin Users Error:", error);
+    return { success: false, users: [], message: "❌ ไม่สามารถดึงข้อมูลบัญชีแอดมินได้" };
+  }
+}
+
+export async function createCouncilUser(formData: FormData) {
+  const name = formData.get("name");
+  const username = formData.get("username");
+  const password = formData.get("password");
+
+  if (
+    typeof name !== "string" || typeof username !== "string" || typeof password !== "string" ||
+    !name.trim() || !username.trim() || !password.trim()
+  ) {
+    return { success: false, message: "❌ กรุณากรอกข้อมูลให้ครบถ้วน" };
+  }
+
+  try {
+    const existing = await db.council.findFirst({ where: { username: username.trim() } });
+    if (existing) {
+      return { success: false, message: "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบสภาแล้ว" };
+    }
+
+    const thaiNow = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Bangkok" });
+    await db.council.create({
+      data: {
+        name: name.trim(),
+        username: username.trim(),
+        password,
+        status: "อนุมัติ",
+        createdAt: thaiNow,
+      },
+    });
+
+    return { success: true, message: "✅ เพิ่มบัญชีสภากลางเรียบร้อยแล้ว" };
+  } catch (error) {
+    console.error("Create Council User Error:", error);
+    return { success: false, message: "❌ ไม่สามารถเพิ่มบัญชีสภากลางได้" };
+  }
+}
+
+export async function createAdminUser(formData: FormData) {
+  const name = formData.get("name");
+  const username = formData.get("username");
+  const password = formData.get("password");
+
+  if (
+    typeof name !== "string" || typeof username !== "string" || typeof password !== "string" ||
+    !name.trim() || !username.trim() || !password.trim()
+  ) {
+    return { success: false, message: "❌ กรุณากรอกข้อมูลให้ครบถ้วน" };
+  }
+
+  try {
+    const existing = await db.admin.findFirst({ where: { username: username.trim() } });
+    if (existing) {
+      return { success: false, message: "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบแอดมินแล้ว" };
+    }
+
+    const thaiNow = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Bangkok" });
+    await db.admin.create({
+      data: {
+        name: name.trim(),
+        username: username.trim(),
+        password,
+        status: "อนุมัติ",
+        createdAt: thaiNow,
+      },
+    });
+
+    return { success: true, message: "✅ เพิ่มบัญชีแอดมินเรียบร้อยแล้ว" };
+  } catch (error) {
+    console.error("Create Admin User Error:", error);
+    return { success: false, message: "❌ ไม่สามารถเพิ่มบัญชีแอดมินได้" };
+  }
+}
+
+export async function updateCouncilUserStatus(id: number, status: "อนุมัติ" | "ระงับใช้งาน") {
+  try {
+    await db.council.update({ where: { id }, data: { status } });
+    return { success: true, message: status === "อนุมัติ" ? "✅ เปิดใช้งานบัญชีสภาแล้ว" : "🔒 ระงับการใช้งานบัญชีสภาแล้ว" };
+  } catch (error) {
+    console.error("Update Council User Status Error:", error);
+    return { success: false, message: "❌ ไม่สามารถอัปเดตสถานะบัญชีสภาได้" };
+  }
+}
+
+export async function updateAdminUserStatus(id: number, status: "อนุมัติ" | "ระงับใช้งาน") {
+  try {
+    await db.admin.update({ where: { id }, data: { status } });
+    return { success: true, message: status === "อนุมัติ" ? "✅ เปิดใช้งานบัญชีแอดมินแล้ว" : "🔒 ระงับการใช้งานบัญชีแอดมินแล้ว" };
+  } catch (error) {
+    console.error("Update Admin User Status Error:", error);
+    return { success: false, message: "❌ ไม่สามารถอัปเดตสถานะบัญชีแอดมินได้" };
+  }
+}
+
+export async function deleteCouncilUser(id: number) {
+  try {
+    await db.council.delete({ where: { id } });
+    return { success: true, message: "🗑️ ลบบัญชีสภาเรียบร้อยแล้ว" };
+  } catch (error) {
+    console.error("Delete Council User Error:", error);
+    return { success: false, message: "❌ ไม่สามารถลบบัญชีสภาได้" };
+  }
+}
+
+export async function deleteAdminUser(id: number) {
+  try {
+    await db.admin.delete({ where: { id } });
+    return { success: true, message: "🗑️ ลบบัญชีแอดมินเรียบร้อยแล้ว" };
+  } catch (error) {
+    console.error("Delete Admin User Error:", error);
+    return { success: false, message: "❌ ไม่สามารถลบบัญชีแอดมินได้" };
   }
 }

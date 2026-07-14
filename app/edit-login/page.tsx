@@ -4,10 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation"; // 👈 นำเข้า Router เพื่อใช้เปลี่ยนหน้า
 import { loginGang } from "../register"; // 👈 เปลี่ยนมานำเข้า Action สำหรับ Login
+import StatusModal from "../components/StatusModal";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const router = useRouter(); // 👈 เรียกใช้งาน Router
+  const [statusModal, setStatusModal] = useState<{ open: boolean; type: "success" | "error"; message: string }>({
+    open: false,
+    type: "success",
+    message: "",
+  });
 
   // ฟังก์ชันครอบตอนกด Submit
   const clientAction = async (formData: FormData) => {
@@ -17,14 +23,18 @@ export default function Home() {
     const result = await loginGang(formData);
     
     setLoading(false);
-    alert(result.message);
+    setStatusModal({ open: true, type: result.success ? "success" : "error", message: result.message });
 
     if (result.success && result.gang) {
       // 💾 1. สั่งบันทึกข้อมูลแก๊งลงใน Browser (localStorage)
       localStorage.setItem("currentGang", JSON.stringify(result.gang));
-      
-      // 🚀 2. ส่งผู้ใช้ไปยังหน้าอื่นทันที (เปลี่ยน path ตรงนี้ตามต้องการ เช่น /dashboard)
-      router.push("/gangs-dashboard"); 
+    }
+  };
+
+  const handleModalClose = () => {
+    setStatusModal((prev) => ({ ...prev, open: false }));
+    if (statusModal.type === "success") {
+      router.push("/gangs-dashboard");
     }
   };
 
@@ -81,6 +91,14 @@ export default function Home() {
 
         </form>
       </main>
+
+      <StatusModal
+        open={statusModal.open}
+        type={statusModal.type}
+        title={statusModal.type === "success" ? "เข้าสู่ระบบสำเร็จ" : "เข้าสู่ระบบไม่สำเร็จ"}
+        message={statusModal.message}
+        onClose={handleModalClose}
+      />
     </div>
   );
 }
