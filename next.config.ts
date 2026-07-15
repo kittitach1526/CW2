@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Allow any domain to access the dev server (use only in development)
+  allowedDevOrigins: [
+    'localhost',
+    '**.*',
+  ],
 };
 
 export default nextConfig;
