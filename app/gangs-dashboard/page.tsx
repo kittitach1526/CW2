@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   createUniformFile,
   getAllUniformFiles,
@@ -519,6 +520,22 @@ export default function GangDashboard() {
           {activeTab === "upload_uniform" && (
             <form onSubmit={handleUploadUniformSubmit} className="flex flex-col gap-5 w-full text-white">
               <h2 className="text-lg font-bold text-teal-400">👕 ฟอร์มเพิ่มไฟล์ชุด/เครื่องแต่งกายสภาแก๊ง</h2>
+
+              <div className="relative w-full h-auto min-h-[16rem] sm:min-h-[24rem] rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-zinc-950/40 group flex items-center justify-center">
+                <Image
+                  src="/ex.jpg"
+                  alt="ตัวอย่างไฟล์ชุด"
+                  width={1200}
+                  height={900}
+                  sizes="(max-width: 768px) 100vw, 700px"
+                  className="w-full h-auto max-h-[70vh] object-contain transition-transform duration-500 group-hover:scale-[1.02]"
+                  priority
+                />
+                <div className="absolute bottom-3 left-4 flex items-center gap-2 text-xs font-medium text-zinc-200/90 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/10">
+                  🖼️ ตัวอย่างไฟล์ชุด
+                </div>
+              </div>
+
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
                 ⏳ ไฟล์ชุดจะถูกบันทึกเป็น "รอลง" และต้องรอให้สภากลางตรวจสอบและนำเข้าก่อนจึงจะสำเร็จ
               </div>
