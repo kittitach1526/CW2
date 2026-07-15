@@ -2,6 +2,7 @@
 "use server";
 
 import { db } from "../lib/db"; // 👈 เช็ก path ตรงนี้ให้ดีว่ามองเห็นไฟล์ db.ts แล้ว
+import type { WelfareRequest } from "@prisma/client";
 
 // ➕ Action สำหรับส่งคำขอยุบแก๊ง (ไม่อัปเดตสถานะทันที รอสภาอนุมัติ)
 export async function requestDisbandGang(abbreviation: string, reason?: string) {
@@ -533,7 +534,7 @@ export async function getWelfareRequestsByGang(gangAbbreviation: string) {
     });
 
     // แปลงข้อมูลวันที่ให้อ่านง่ายก่อนส่งกลับไป Client Component
-    const formattedRequests = requests.map(req => ({
+    const formattedRequests = requests.map((req: WelfareRequest) => ({
       ...req,
       createdAt: req.createdAt.toLocaleString("th-TH"), 
     }));
@@ -641,7 +642,7 @@ export async function getAllWelfareRequests() {
     });
     
     // จัดรูปแบบโครงสร้างเวลาก่อนส่งไปแสดงผล
-    const formattedRequests = requests.map(req => ({
+    const formattedRequests = requests.map((req: WelfareRequest) => ({
       ...req,
       createdAt: req.createdAt ? req.createdAt.toLocaleString("th-TH") : "ไม่ระบุเวลา"
     }));
