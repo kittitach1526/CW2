@@ -1,0 +1,921 @@
+import os
+import sqlite3
+from datetime import datetime
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+
+from database import get_db, init_db
+
+app = Flask(__name__)
+CORS(app)
+
+ROOT_USERNAME = os.environ.get("ROOT_USERNAME", "root")
+ROOT_PASSWORD = os.environ.get("ROOT_PASSWORD", "changeme123")
+
+
+def now_thai():
+    """Return current Thai time as 'YYYY-MM-DD HH:MM:SS' (same locale as sv-SE)."""
+    try:
+        from zoneinfo import ZoneInfo
+        dt = datetime.now(ZoneInfo("Asia/Bangkok"))
+    except Exception:
+        dt = datetime.utcnow()
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def row_to_dict(row):
+    if row is None:
+        return None
+    return {key: row[key] for key in row.keys()}
+
+
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Gangs
+# ---------------------------------------------------------------------------
+@app.route("/api/gangs/register", methods=["POST"])
+def register_gang():
+    data = request.get_json(silent=True) or {}
+    required = [
+        "fullName", "abbreviation", "password", "type", "leader",
+        "leaderDiscord", "approver",
+    ]
+    if not all(data.get(k) for k in required):
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        existing = db.execute(
+            "SELECT id FROM gangs WHERE abbreviation = ?", (data["abbreviation"].strip(),)
+        ).fetchone()
+        if existing:
+            return jsonify({"success": False, "message": f"⚠️ ชื่อย่อ \"{data['abbreviation']}\" มีผู้ใช้งานในระบบแล้ว"}), 409
+
+        db.execute(
+            """
+            INSERT INTO gangs
+            (fullName, abbreviation, password, colorTheme, type, leader, leaderDiscord,
+             coLeader1, coLeader1Discord, coLeader2, coLeader2Discord, approver, logoUrl, status, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                data["fullName"].strip(),
+                data["abbreviation"].strip(),
+                data["password"],
+                data.get("colorTheme", "#3b82f6"),
+                data.get("type", "Gang"),
+                data["leader"].strip(),
+                data["leaderDiscord"].strip(),
+                data.get("coLeader1") or None,
+                data.get("coLeader1Discord") or None,
+                data.get("coLeader2") or None,
+                data.get("coLeader2Discord") or None,
+                data["approver"].strip(),
+                data.get("logoUrl") or None,
+                "pending",
+                now_thai(),
+            ),
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "🎉 ลงทะเบียนแก๊งสำเร็จเรียบร้อยแล้วครับ!"}), 201
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการบันทึกข้อมูลลงระบบ"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/gangs/login", methods=["POST"])
+def login_gang():
+    data = request.get_json(silent=True) or {}
+    abbreviation = data.get("abbreviation", "").strip()
+    password = data.get("password", "")
+    if not abbreviation or not password:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        gang = db.execute(
+            "SELECT * FROM gangs WHERE abbreviation = ?", (abbreviation,)
+        ).fetchone()
+        if not gang or gang["password"] != password:
+            return jsonify({"success": False, "message": "❌ ชื่อย่อหรือรหัสผ่านไม่ถูกต้อง"}), 401
+        if gang["status"] == "รอยุบ":
+            return jsonify({"success": False, "message": "🔒 แก๊งนี้อยู่ในสถานะ 'รอยุบ' ระบบแผงควบคุมถูกระงับการเข้าใช้งานชั่วคราว"}), 403
+
+        return jsonify({"success": True, "message": "🎉 เข้าสู่ระบบสำเร็จ!", "gang": row_to_dict(gang)})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่พบข้อมูล"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/gangs", methods=["GET"])
+def get_all_gangs():
+    db = get_db()
+    try:
+        rows = db.execute("SELECT * FROM gangs ORDER BY id DESC").fetchall()
+        return jsonify({"success": True, "gangs": [row_to_dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "gangs": [], "message": "❌ ไม่สามารถดึงข้อมูลรายชื่อแก๊งได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/gangs/<int:id>/status", methods=["PATCH"])
+def update_gang_status(id):
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    if not status:
+        return jsonify({"success": False, "message": "❌ ข้อมูลไม่ครบถ้วนสำหรับการเปลี่ยนสถานะ"}), 400
+
+    db = get_db()
+    try:
+        db.execute("UPDATE gangs SET status = ? WHERE id = ?", (status, id))
+        db.commit()
+        msg = f"✨ เปลี่ยนสถานะแก๊งเป็น '{status}' เรียบร้อยแล้ว"
+        if status == "approved":
+            msg = "🎉 อนุมัติสิทธิ์ภาคีเครือข่ายแก๊งเข้าสู่ระบบสภากลางสำเร็จ!"
+        if status == "disbanded":
+            msg = "❌ ทำการระงับสิทธิ์/ยื่นเรื่องยุบกลุ่มแก๊งออกจากระบบถาวรแล้ว"
+        return jsonify({"success": True, "message": msg})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในระบบฐานข้อมูลสภา"}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Gang Edit Requests
+# ---------------------------------------------------------------------------
+@app.route("/api/gangs/<int:gang_id>/edit-requests", methods=["POST"])
+def create_gang_edit_request(gang_id):
+    data = request.get_json(silent=True) or {}
+    required = ["fullName", "abbreviation", "leader", "leaderDiscord", "type"]
+    if not all(data.get(k) for k in required):
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        existing = db.execute("SELECT * FROM gangs WHERE id = ?", (gang_id,)).fetchone()
+        if not existing:
+            return jsonify({"success": False, "message": "❌ ไม่พบแก๊งในระบบ"}), 404
+
+        new_abbr = data["abbreviation"].strip()
+        if new_abbr != existing["abbreviation"]:
+            taken = db.execute("SELECT id FROM gangs WHERE abbreviation = ?", (new_abbr,)).fetchone()
+            if taken:
+                return jsonify({"success": False, "message": "❌ ชื่อย่อแก๊งนี้ถูกใช้งานแล้ว"}), 409
+
+        payload = {
+            "fullName": data["fullName"].strip(),
+            "abbreviation": new_abbr,
+            "colorTheme": data.get("colorTheme", "#3b82f6"),
+            "leader": data["leader"].strip(),
+            "leaderDiscord": data["leaderDiscord"].strip(),
+            "coLeader1": data.get("coLeader1") or None,
+            "coLeader1Discord": data.get("coLeader1Discord") or None,
+            "coLeader2": data.get("coLeader2") or None,
+            "coLeader2Discord": data.get("coLeader2Discord") or None,
+            "type": data.get("type", existing["type"]),
+            "editReason": data.get("editReason") or None,
+            "newPassword": data.get("newPassword") or None,
+        }
+
+        pending = db.execute(
+            "SELECT id FROM gang_edit_requests WHERE gangId = ? AND status = 'pending'",
+            (gang_id,),
+        ).fetchone()
+
+        if pending:
+            db.execute(
+                """
+                UPDATE gang_edit_requests SET
+                    fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?,
+                    coLeader1 = ?, coLeader1Discord = ?, coLeader2 = ?, coLeader2Discord = ?,
+                    type = ?, editReason = ?, newPassword = ?, createdAt = ?
+                WHERE id = ?
+                """,
+                (
+                    payload["fullName"], payload["abbreviation"], payload["colorTheme"],
+                    payload["leader"], payload["leaderDiscord"], payload["coLeader1"],
+                    payload["coLeader1Discord"], payload["coLeader2"], payload["coLeader2Discord"],
+                    payload["type"], payload["editReason"], payload["newPassword"], now_thai(),
+                    pending["id"],
+                ),
+            )
+            db.commit()
+            updated = db.execute(
+                "SELECT * FROM gang_edit_requests WHERE id = ?", (pending["id"],)
+            ).fetchone()
+            return jsonify({
+                "success": True,
+                "message": "📝 อัปเดตคำขอแก้ไขข้อมูลที่รออนุมัติสำเร็จแล้ว",
+                "editRequest": row_to_dict(updated),
+            })
+
+        db.execute(
+            """
+            INSERT INTO gang_edit_requests
+            (gangId, fullName, abbreviation, colorTheme, leader, leaderDiscord,
+             coLeader1, coLeader1Discord, coLeader2, coLeader2Discord, type,
+             editReason, newPassword, status, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+            """,
+            (
+                gang_id, payload["fullName"], payload["abbreviation"], payload["colorTheme"],
+                payload["leader"], payload["leaderDiscord"], payload["coLeader1"],
+                payload["coLeader1Discord"], payload["coLeader2"], payload["coLeader2Discord"],
+                payload["type"], payload["editReason"], payload["newPassword"], now_thai(),
+            ),
+        )
+        db.commit()
+        created_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        created = db.execute(
+            "SELECT * FROM gang_edit_requests WHERE id = ?", (created_id,)
+        ).fetchone()
+        return jsonify({
+            "success": True,
+            "message": "📝 ส่งคำขอแก้ไขข้อมูลแก๊งไปยังสภากลางแล้ว กรุณารออนุมัติ",
+            "editRequest": row_to_dict(created),
+        }), 201
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการส่งคำขอแก้ไขข้อมูล"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/gangs/<int:gang_id>/edit-requests", methods=["GET"])
+def get_gang_edit_request_by_gang(gang_id):
+    db = get_db()
+    try:
+        row = db.execute(
+            """
+            SELECT * FROM gang_edit_requests
+            WHERE gangId = ? AND status = 'pending'
+            ORDER BY createdAt DESC LIMIT 1
+            """,
+            (gang_id,),
+        ).fetchone()
+        return jsonify({"success": True, "request": row_to_dict(row)})
+    except Exception as e:
+        return jsonify({"success": False, "request": None}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/edit-requests/pending", methods=["GET"])
+def get_pending_gang_edit_requests():
+    db = get_db()
+    try:
+        rows = db.execute(
+            """
+            SELECT r.*, g.id as gang_id, g.fullName as gang_fullName,
+                   g.abbreviation as gang_abbreviation
+            FROM gang_edit_requests r
+            JOIN gangs g ON g.id = r.gangId
+            WHERE r.status = 'pending'
+            ORDER BY r.createdAt DESC
+            """
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = row_to_dict(r)
+            d["gang"] = {
+                "id": r["gang_id"],
+                "fullName": r["gang_fullName"],
+                "abbreviation": r["gang_abbreviation"],
+            }
+            del d["gang_id"]
+            del d["gang_fullName"]
+            del d["gang_abbreviation"]
+            result.append(d)
+        return jsonify({"success": True, "requests": result})
+    except Exception as e:
+        return jsonify({"success": False, "requests": []}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/edit-requests/<int:id>/approve", methods=["POST"])
+def approve_gang_edit_request(id):
+    data = request.get_json(silent=True) or {}
+    reviewer = data.get("reviewer", "สภากลาง")
+    db = get_db()
+    try:
+        req = db.execute("SELECT * FROM gang_edit_requests WHERE id = ?", (id,)).fetchone()
+        if not req or req["status"] != "pending":
+            return jsonify({"success": False, "message": "❌ ไม่พบคำขอ หรือคำขอนี้ถูกดำเนินการไปแล้ว"}), 404
+
+        if req["newPassword"]:
+            db.execute(
+                """
+                UPDATE gangs SET
+                    fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?,
+                    coLeader1 = ?, coLeader1Discord = ?, coLeader2 = ?, coLeader2Discord = ?,
+                    type = ?, editReason = ?, password = ?
+                WHERE id = ?
+                """,
+                (
+                    req["fullName"], req["abbreviation"], req["colorTheme"], req["leader"],
+                    req["leaderDiscord"], req["coLeader1"], req["coLeader1Discord"],
+                    req["coLeader2"], req["coLeader2Discord"], req["type"], req["editReason"],
+                    req["newPassword"], req["gangId"],
+                ),
+            )
+        else:
+            db.execute(
+                """
+                UPDATE gangs SET
+                    fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?,
+                    coLeader1 = ?, coLeader1Discord = ?, coLeader2 = ?, coLeader2Discord = ?,
+                    type = ?, editReason = ?
+                WHERE id = ?
+                """,
+                (
+                    req["fullName"], req["abbreviation"], req["colorTheme"], req["leader"],
+                    req["leaderDiscord"], req["coLeader1"], req["coLeader1Discord"],
+                    req["coLeader2"], req["coLeader2Discord"], req["type"], req["editReason"],
+                    req["gangId"],
+                ),
+            )
+        db.execute(
+            "UPDATE gang_edit_requests SET status = 'approved', reviewer = ?, reviewedAt = ? WHERE id = ?",
+            (reviewer, now_thai(), id),
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "✅ อนุมัติการแก้ไขข้อมูลแก๊งสำเร็จแล้ว"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการอนุมัติคำขอ"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/edit-requests/<int:id>/reject", methods=["POST"])
+def reject_gang_edit_request(id):
+    data = request.get_json(silent=True) or {}
+    reviewer = data.get("reviewer", "สภากลาง")
+    db = get_db()
+    try:
+        req = db.execute("SELECT * FROM gang_edit_requests WHERE id = ?", (id,)).fetchone()
+        if not req or req["status"] != "pending":
+            return jsonify({"success": False, "message": "❌ ไม่พบคำขอ หรือคำขอนี้ถูกดำเนินการไปแล้ว"}), 404
+
+        db.execute(
+            "UPDATE gang_edit_requests SET status = 'rejected', reviewer = ?, reviewedAt = ? WHERE id = ?",
+            (reviewer, now_thai(), id),
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "✕ ปฏิเสธคำขอแก้ไขข้อมูลแก๊งแล้ว"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการปฏิเสธคำขอ"}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Disband Requests
+# ---------------------------------------------------------------------------
+@app.route("/api/gangs/disband", methods=["POST"])
+def request_disband_gang():
+    data = request.get_json(silent=True) or {}
+    abbreviation = data.get("abbreviation", "").strip()
+    reason = data.get("reason")
+    if not abbreviation:
+        return jsonify({"success": False, "message": "❌ ไม่พบข้อมูลชื่อย่อแก๊ง"}), 400
+
+    db = get_db()
+    try:
+        gang = db.execute("SELECT * FROM gangs WHERE abbreviation = ?", (abbreviation,)).fetchone()
+        if not gang:
+            return jsonify({"success": False, "message": "❌ ไม่พบแก๊งในระบบ"}), 404
+
+        existing = db.execute(
+            "SELECT * FROM disband_requests WHERE gangId = ?", (gang["id"],)
+        ).fetchone()
+        if existing and existing["status"] == "pending":
+            return jsonify({"success": False, "message": "⏳ คำขอยุบแก๊งนี้กำลังรอการอนุมัติจากสภากลางอยู่แล้ว"}), 409
+
+        if existing:
+            db.execute(
+                "UPDATE disband_requests SET status = 'pending', reason = ?, createdAt = ?, reviewedAt = NULL, reviewer = NULL WHERE gangId = ?",
+                (reason or None, now_thai(), gang["id"]),
+            )
+        else:
+            db.execute(
+                "INSERT INTO disband_requests (gangId, reason, status, createdAt) VALUES (?, ?, 'pending', ?)",
+                (gang["id"], reason or None, now_thai()),
+            )
+        db.commit()
+        return jsonify({"success": True, "message": "⚠️ ส่งเรื่องขอยุบแก๊งไปยังระบบสภากลางเรียบร้อยแล้ว กรุณารอสภาพิจารณา"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในระบบฐานข้อมูล"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/disband-requests", methods=["GET"])
+def get_pending_disband_requests():
+    db = get_db()
+    try:
+        rows = db.execute(
+            """
+            SELECT d.*, g.id as gang_id, g.fullName as gang_fullName,
+                   g.abbreviation as gang_abbreviation, g.leader as gang_leader
+            FROM disband_requests d
+            JOIN gangs g ON g.id = d.gangId
+            WHERE d.status = 'pending'
+            ORDER BY d.createdAt DESC
+            """
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = row_to_dict(r)
+            d["gang"] = {
+                "id": r["gang_id"],
+                "fullName": r["gang_fullName"],
+                "abbreviation": r["gang_abbreviation"],
+                "leader": r["gang_leader"],
+            }
+            del d["gang_id"]
+            del d["gang_fullName"]
+            del d["gang_abbreviation"]
+            del d["gang_leader"]
+            result.append(d)
+        return jsonify({"success": True, "requests": result})
+    except Exception as e:
+        return jsonify({"success": False, "requests": []}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/gangs/<int:gang_id>/disband-request", methods=["GET"])
+def get_disband_request_by_gang(gang_id):
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT * FROM disband_requests WHERE gangId = ?", (gang_id,)
+        ).fetchone()
+        return jsonify({"success": True, "request": row_to_dict(row)})
+    except Exception as e:
+        return jsonify({"success": False, "request": None}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/disband-requests/<int:id>/approve", methods=["POST"])
+def approve_disband_request(id):
+    data = request.get_json(silent=True) or {}
+    reviewer = data.get("reviewer", "สภากลาง")
+    db = get_db()
+    try:
+        req = db.execute("SELECT * FROM disband_requests WHERE id = ?", (id,)).fetchone()
+        if not req or req["status"] != "pending":
+            return jsonify({"success": False, "message": "❌ ไม่พบคำขอ หรือคำขอนี้ถูกดำเนินการไปแล้ว"}), 404
+
+        db.execute("UPDATE gangs SET status = 'รอยุบ' WHERE id = ?", (req["gangId"],))
+        db.execute(
+            "UPDATE disband_requests SET status = 'approved', reviewer = ?, reviewedAt = ? WHERE id = ?",
+            (reviewer, now_thai(), id),
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "✅ อนุมัติคำขอยุบแก๊งแล้ว สถานะแก๊งเปลี่ยนเป็น 'รอยุบ'"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการอนุมัติคำขอยุบแก๊ง"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/disband-requests/<int:id>/reject", methods=["POST"])
+def reject_disband_request(id):
+    data = request.get_json(silent=True) or {}
+    reviewer = data.get("reviewer", "สภากลาง")
+    db = get_db()
+    try:
+        req = db.execute("SELECT * FROM disband_requests WHERE id = ?", (id,)).fetchone()
+        if not req or req["status"] != "pending":
+            return jsonify({"success": False, "message": "❌ ไม่พบคำขอ หรือคำขอนี้ถูกดำเนินการไปแล้ว"}), 404
+
+        db.execute(
+            "UPDATE disband_requests SET status = 'rejected', reviewer = ?, reviewedAt = ? WHERE id = ?",
+            (reviewer, now_thai(), id),
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "✕ ปฏิเสธคำขอยุบแก๊งแล้ว"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการปฏิเสธคำขอ"}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Uniform Files
+# ---------------------------------------------------------------------------
+@app.route("/api/uniform-files", methods=["POST"])
+def create_uniform_file():
+    data = request.get_json(silent=True) or {}
+    required = ["gangName", "uniformType", "fileUrl", "approver", "approverDiscord"]
+    if not all(data.get(k) for k in required):
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลไฟล์ชุดให้ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        db.execute(
+            """
+            INSERT INTO uniform_files
+            (gangName, uniformType, fileUrl, approver, approverDiscord, reason, status, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, 'รอลง', ?)
+            """,
+            (
+                data["gangName"].strip(),
+                data["uniformType"].strip(),
+                data["fileUrl"].strip(),
+                data["approver"].strip(),
+                data["approverDiscord"].strip(),
+                data.get("reason") or None,
+                now_thai(),
+            ),
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "🎉 เพิ่มไฟล์ชุดเรียบร้อยแล้ว!"}), 201
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการบันทึกไฟล์ชุด"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/uniform-files", methods=["GET"])
+def get_all_uniform_files():
+    db = get_db()
+    try:
+        rows = db.execute("SELECT * FROM uniform_files ORDER BY id DESC").fetchall()
+        return jsonify({"success": True, "files": [row_to_dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถดึงข้อมูลไฟล์ชุดได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/uniform-files/<int:id>/link", methods=["PATCH"])
+def update_uniform_file_link(id):
+    data = request.get_json(silent=True) or {}
+    new_file_url = data.get("newFileUrl", "").strip()
+    reason = data.get("reason", "").strip()
+    if not new_file_url:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกลิงก์ไฟล์ใหม่"}), 400
+    if not reason:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกเหตุผลการเปลี่ยนลิงก์ไฟล์ชุด"}), 400
+
+    db = get_db()
+    try:
+        db.execute(
+            "UPDATE uniform_files SET fileUrl = ?, reason = ?, status = 'รอลง' WHERE id = ?",
+            (new_file_url, reason, id),
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "🔄 อัปเดตลิงก์ไฟล์ชุดใหม่ พร้อมเหตุผลเรียบร้อย ส่งเรื่องให้แอดมินตรวจสอบแล้ว!"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตไฟล์ชุดได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/uniform-files/<int:id>/status", methods=["PATCH"])
+def update_uniform_status(id):
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    if not status:
+        return jsonify({"success": False, "message": "❌ ไม่พบรหัสไฟล์ชุดเสื้อผ้า"}), 400
+
+    db = get_db()
+    try:
+        db.execute("UPDATE uniform_files SET status = ? WHERE id = ?", (status, id))
+        db.commit()
+        msg = (
+            "👕 อัปเดตสถานะ: โมเดลชุดถูกติดตั้งเข้าเซิร์ฟเวอร์หลักเรียบร้อย!"
+            if status == "ลงแล้ว"
+            else "❌ ปฏิเสธไฟล์ชุดทรัพยากรดังกล่าว"
+        )
+        return jsonify({"success": True, "message": msg})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตไฟล์ชุดในฐานข้อมูลได้"}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Welfare Requests
+# ---------------------------------------------------------------------------
+@app.route("/api/welfare", methods=["POST"])
+def create_welfare_request():
+    data = request.get_json(silent=True) or {}
+    required = ["requestName", "discordId", "welfareItem"]
+    if not all(data.get(k) for k in required):
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        db.execute(
+            """
+            INSERT INTO welfare_requests
+            (gangName, gangAbbreviation, requestName, discordId, welfareItem, status, createdAt)
+            VALUES (?, ?, ?, ?, ?, 'รอรับ', ?)
+            """,
+            (
+                data.get("gangName") or None,
+                data.get("gangAbbreviation") or None,
+                data["requestName"].strip(),
+                data["discordId"].strip(),
+                data["welfareItem"].strip(),
+                now_thai(),
+            ),
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "📦 ส่งคำขอรับสวัสดิการไปยังระบบสภากลางเรียบร้อยแล้ว!"}), 201
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในระบบฐานข้อมูล"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare", methods=["GET"])
+def get_all_welfare_requests():
+    db = get_db()
+    try:
+        rows = db.execute("SELECT * FROM welfare_requests ORDER BY id DESC").fetchall()
+        return jsonify({"success": True, "requests": [row_to_dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "requests": [], "message": "❌ ไม่สามารถดึงข้อมูลคำขอสวัสดิการได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare/gang/<gang_abbreviation>", methods=["GET"])
+def get_welfare_requests_by_gang(gang_abbreviation):
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT * FROM welfare_requests WHERE gangAbbreviation = ? ORDER BY createdAt DESC",
+            (gang_abbreviation,),
+        ).fetchall()
+        return jsonify({"success": True, "requests": [row_to_dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "requests": [], "message": "❌ ไม่สามารถโหลดข้อมูลสวัสดิการได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare/<int:id>/status", methods=["PATCH"])
+def update_welfare_status(id):
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    if not status:
+        return jsonify({"success": False, "message": "❌ ข้อมูลไม่ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        db.execute("UPDATE welfare_requests SET status = ? WHERE id = ?", (status, id))
+        db.commit()
+        msg = (
+            "✅ อนุมัติการแจกจ่ายพัสดุและทำเครื่องหมายส่งมอบแล้ว"
+            if status == "รับไปแล้ว"
+            else "❌ ยกเลิก/นำคำขอสวัสดิการนี้ออกจากระบบแล้ว"
+        )
+        return jsonify({"success": True, "message": msg})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตสถานะสวัสดิการได้"}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Council Users
+# ---------------------------------------------------------------------------
+@app.route("/api/council/login", methods=["POST"])
+def login_council():
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password", "")
+    if not username or not password:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        user = db.execute(
+            "SELECT * FROM council_users WHERE username = ?", (username,)
+        ).fetchone()
+        if not user:
+            return jsonify({"success": False, "message": "❌ ไม่พบชื่อผู้ใช้ในระบบ"}), 404
+        if user["password"] != password:
+            return jsonify({"success": False, "message": "❌ รหัสผ่านไม่ถูกต้อง"}), 401
+        if user["status"] == "ระงับใช้งาน":
+            return jsonify({"success": False, "message": "🔒 บัญชีนี้ถูกสภากลางระงับการใช้งานแล้ว"}), 403
+
+        return jsonify({
+            "success": True,
+            "message": "🎉 เข้าสู่ระบบสภากลางสำเร็จ!",
+            "council": row_to_dict(user),
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ฐานข้อมูลระบบสภาขัดข้อง (ดู Terminal)"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/council", methods=["GET"])
+def get_all_council_users():
+    db = get_db()
+    try:
+        rows = db.execute("SELECT * FROM council_users ORDER BY id DESC").fetchall()
+        return jsonify({"success": True, "users": [row_to_dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "users": [], "message": "❌ ไม่สามารถดึงข้อมูลบัญชีสภาได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/council", methods=["POST"])
+def create_council_user():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    username = (data.get("username") or "").strip()
+    password = data.get("password", "")
+    if not name or not username or not password:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        existing = db.execute(
+            "SELECT id FROM council_users WHERE username = ?", (username,)
+        ).fetchone()
+        if existing:
+            return jsonify({"success": False, "message": "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบสภาแล้ว"}), 409
+
+        db.execute(
+            "INSERT INTO council_users (name, username, password, status, createdAt) VALUES (?, ?, ?, 'อนุมัติ', ?)",
+            (name, username, password, now_thai()),
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "✅ เพิ่มบัญชีสภากลางเรียบร้อยแล้ว"}), 201
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถเพิ่มบัญชีสภากลางได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/council/<int:id>/status", methods=["PATCH"])
+def update_council_user_status(id):
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    db = get_db()
+    try:
+        db.execute("UPDATE council_users SET status = ? WHERE id = ?", (status, id))
+        db.commit()
+        msg = "✅ เปิดใช้งานบัญชีสภาแล้ว" if status == "อนุมัติ" else "🔒 ระงับการใช้งานบัญชีสภาแล้ว"
+        return jsonify({"success": True, "message": msg})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตสถานะบัญชีสภาได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/council/<int:id>", methods=["DELETE"])
+def delete_council_user(id):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM council_users WHERE id = ?", (id,))
+        db.commit()
+        return jsonify({"success": True, "message": "🗑️ ลบบัญชีสภาเรียบร้อยแล้ว"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถลบบัญชีสภาได้"}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Admin Users
+# ---------------------------------------------------------------------------
+@app.route("/api/admin/login", methods=["POST"])
+def login_admin():
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password", "")
+    if not username or not password:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        user = db.execute("SELECT * FROM admin_users WHERE username = ?", (username,)).fetchone()
+        if not user:
+            return jsonify({"success": False, "message": "❌ ไม่พบชื่อผู้ดูแลระบบในสารบบ"}), 404
+        if user["password"] != password:
+            return jsonify({"success": False, "message": "❌ รหัสผ่านไม่ถูกต้อง"}), 401
+        if user["status"] == "ระงับใช้งาน":
+            return jsonify({"success": False, "message": "🔒 บัญชีผู้ดูแลระบบนี้ถูกระงับสิทธิ์การใช้งานแล้ว"}), 403
+        if user["status"] == "รอรับ":
+            return jsonify({"success": False, "message": "⏳ บัญชีผู้ดูแลระบบนี้อยู่ระหว่างรอเปิดใช้งาน"}), 403
+
+        return jsonify({
+            "success": True,
+            "message": "🎉 เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!",
+            "admin": row_to_dict(user),
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ฐานข้อมูลระบบแอดมินขัดข้อง (ดู Terminal)"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/admin", methods=["GET"])
+def get_all_admin_users():
+    db = get_db()
+    try:
+        rows = db.execute("SELECT * FROM admin_users ORDER BY id DESC").fetchall()
+        return jsonify({"success": True, "users": [row_to_dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "users": [], "message": "❌ ไม่สามารถดึงข้อมูลบัญชีแอดมินได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/admin", methods=["POST"])
+def create_admin_user():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    username = (data.get("username") or "").strip()
+    password = data.get("password", "")
+    if not name or not username or not password:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        existing = db.execute("SELECT id FROM admin_users WHERE username = ?", (username,)).fetchone()
+        if existing:
+            return jsonify({"success": False, "message": "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบแอดมินแล้ว"}), 409
+
+        db.execute(
+            "INSERT INTO admin_users (name, username, password, status, createdAt) VALUES (?, ?, ?, 'อนุมัติ', ?)",
+            (name, username, password, now_thai()),
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "✅ เพิ่มบัญชีแอดมินเรียบร้อยแล้ว"}), 201
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถเพิ่มบัญชีแอดมินได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/admin/<int:id>/status", methods=["PATCH"])
+def update_admin_user_status(id):
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    db = get_db()
+    try:
+        db.execute("UPDATE admin_users SET status = ? WHERE id = ?", (status, id))
+        db.commit()
+        msg = "✅ เปิดใช้งานบัญชีแอดมินแล้ว" if status == "อนุมัติ" else "🔒 ระงับการใช้งานบัญชีแอดมินแล้ว"
+        return jsonify({"success": True, "message": msg})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตสถานะบัญชีแอดมินได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/admin/<int:id>", methods=["DELETE"])
+def delete_admin_user(id):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM admin_users WHERE id = ?", (id,))
+        db.commit()
+        return jsonify({"success": True, "message": "🗑️ ลบบัญชีแอดมินเรียบร้อยแล้ว"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถลบบัญชีแอดมินได้"}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Root login (stateless - kept here for completeness)
+# ---------------------------------------------------------------------------
+@app.route("/api/root/login", methods=["POST"])
+def login_root():
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password", "")
+    if not username or not password:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
+    if username != ROOT_USERNAME or password != ROOT_PASSWORD:
+        return jsonify({"success": False, "message": "❌ ชื่อผู้ใช้หรือรหัสผ่านผู้ดูแลสูงสุดไม่ถูกต้อง"}), 401
+    return jsonify({
+        "success": True,
+        "message": "🎉 เข้าสู่ระบบผู้ดูแลสูงสุดสำเร็จ!",
+        "root": {"username": ROOT_USERNAME},
+    })
+
+
+if __name__ == "__main__":
+    init_db()
+    app.run(host="0.0.0.0", port=5000, debug=True)

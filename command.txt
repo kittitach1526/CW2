@@ -1,2 +1,0 @@
-npx prisma migrate dev --name add_welfare_requests
-npx prisma generate
