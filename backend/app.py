@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 from datetime import datetime
@@ -10,7 +11,7 @@ app = Flask(__name__)
 CORS(app)
 
 ROOT_USERNAME = os.environ.get("ROOT_USERNAME", "root")
-ROOT_PASSWORD = os.environ.get("ROOT_PASSWORD", "changeme123")
+ROOT_PASSWORD = os.environ.get("ROOT_PASSWORD", "p@ssw0rd")
 
 
 def now_thai():
@@ -176,12 +177,16 @@ def create_gang_edit_request(gang_id):
             "colorTheme": data.get("colorTheme", "#3b82f6"),
             "leader": data["leader"].strip(),
             "leaderDiscord": data["leaderDiscord"].strip(),
+            "leaderPhone": data.get("leaderPhone") or None,
             "coLeader1": data.get("coLeader1") or None,
             "coLeader1Discord": data.get("coLeader1Discord") or None,
+            "coLeader1Phone": data.get("coLeader1Phone") or None,
             "coLeader2": data.get("coLeader2") or None,
             "coLeader2Discord": data.get("coLeader2Discord") or None,
+            "coLeader2Phone": data.get("coLeader2Phone") or None,
             "type": data.get("type", existing["type"]),
             "editReason": data.get("editReason") or None,
+            "approver": data.get("approver") or None,
             "newPassword": data.get("newPassword") or None,
         }
 
@@ -194,16 +199,17 @@ def create_gang_edit_request(gang_id):
             db.execute(
                 """
                 UPDATE gang_edit_requests SET
-                    fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?,
-                    coLeader1 = ?, coLeader1Discord = ?, coLeader2 = ?, coLeader2Discord = ?,
-                    type = ?, editReason = ?, newPassword = ?, createdAt = ?
+                    fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?, leaderPhone = ?,
+                    coLeader1 = ?, coLeader1Discord = ?, coLeader1Phone = ?, coLeader2 = ?, coLeader2Discord = ?, coLeader2Phone = ?,
+                    type = ?, editReason = ?, approver = ?, newPassword = ?, createdAt = ?
                 WHERE id = ?
                 """,
                 (
                     payload["fullName"], payload["abbreviation"], payload["colorTheme"],
-                    payload["leader"], payload["leaderDiscord"], payload["coLeader1"],
-                    payload["coLeader1Discord"], payload["coLeader2"], payload["coLeader2Discord"],
-                    payload["type"], payload["editReason"], payload["newPassword"], now_thai(),
+                    payload["leader"], payload["leaderDiscord"], payload["leaderPhone"],
+                    payload["coLeader1"], payload["coLeader1Discord"], payload["coLeader1Phone"],
+                    payload["coLeader2"], payload["coLeader2Discord"], payload["coLeader2Phone"],
+                    payload["type"], payload["editReason"], payload["approver"], payload["newPassword"], now_thai(),
                     pending["id"],
                 ),
             )
@@ -220,16 +226,17 @@ def create_gang_edit_request(gang_id):
         db.execute(
             """
             INSERT INTO gang_edit_requests
-            (gangId, fullName, abbreviation, colorTheme, leader, leaderDiscord,
-             coLeader1, coLeader1Discord, coLeader2, coLeader2Discord, type,
-             editReason, newPassword, status, createdAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+            (gangId, fullName, abbreviation, colorTheme, leader, leaderDiscord, leaderPhone,
+             coLeader1, coLeader1Discord, coLeader1Phone, coLeader2, coLeader2Discord, coLeader2Phone, type,
+             editReason, approver, newPassword, status, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
             """,
             (
                 gang_id, payload["fullName"], payload["abbreviation"], payload["colorTheme"],
-                payload["leader"], payload["leaderDiscord"], payload["coLeader1"],
-                payload["coLeader1Discord"], payload["coLeader2"], payload["coLeader2Discord"],
-                payload["type"], payload["editReason"], payload["newPassword"], now_thai(),
+                payload["leader"], payload["leaderDiscord"], payload["leaderPhone"],
+                payload["coLeader1"], payload["coLeader1Discord"], payload["coLeader1Phone"],
+                payload["coLeader2"], payload["coLeader2Discord"], payload["coLeader2Phone"],
+                payload["type"], payload["editReason"], payload["approver"], payload["newPassword"], now_thai(),
             ),
         )
         db.commit()
@@ -314,32 +321,32 @@ def approve_gang_edit_request(id):
             db.execute(
                 """
                 UPDATE gangs SET
-                    fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?,
-                    coLeader1 = ?, coLeader1Discord = ?, coLeader2 = ?, coLeader2Discord = ?,
+                    fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?, leaderPhone = ?,
+                    coLeader1 = ?, coLeader1Discord = ?, coLeader1Phone = ?, coLeader2 = ?, coLeader2Discord = ?, coLeader2Phone = ?,
                     type = ?, editReason = ?, password = ?
                 WHERE id = ?
                 """,
                 (
                     req["fullName"], req["abbreviation"], req["colorTheme"], req["leader"],
-                    req["leaderDiscord"], req["coLeader1"], req["coLeader1Discord"],
-                    req["coLeader2"], req["coLeader2Discord"], req["type"], req["editReason"],
-                    req["newPassword"], req["gangId"],
+                    req["leaderDiscord"], req["leaderPhone"], req["coLeader1"], req["coLeader1Discord"],
+                    req["coLeader1Phone"], req["coLeader2"], req["coLeader2Discord"], req["coLeader2Phone"],
+                    req["type"], req["editReason"], req["newPassword"], req["gangId"],
                 ),
             )
         else:
             db.execute(
                 """
                 UPDATE gangs SET
-                    fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?,
-                    coLeader1 = ?, coLeader1Discord = ?, coLeader2 = ?, coLeader2Discord = ?,
+                    fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?, leaderPhone = ?,
+                    coLeader1 = ?, coLeader1Discord = ?, coLeader1Phone = ?, coLeader2 = ?, coLeader2Discord = ?, coLeader2Phone = ?,
                     type = ?, editReason = ?
                 WHERE id = ?
                 """,
                 (
                     req["fullName"], req["abbreviation"], req["colorTheme"], req["leader"],
-                    req["leaderDiscord"], req["coLeader1"], req["coLeader1Discord"],
-                    req["coLeader2"], req["coLeader2Discord"], req["type"], req["editReason"],
-                    req["gangId"],
+                    req["leaderDiscord"], req["leaderPhone"], req["coLeader1"], req["coLeader1Discord"],
+                    req["coLeader1Phone"], req["coLeader2"], req["coLeader2Discord"], req["coLeader2Phone"],
+                    req["type"], req["editReason"], req["gangId"],
                 ),
             )
         db.execute(
@@ -384,6 +391,7 @@ def request_disband_gang():
     data = request.get_json(silent=True) or {}
     abbreviation = data.get("abbreviation", "").strip()
     reason = data.get("reason")
+    approver = data.get("approver")
     if not abbreviation:
         return jsonify({"success": False, "message": "❌ ไม่พบข้อมูลชื่อย่อแก๊ง"}), 400
 
@@ -401,13 +409,13 @@ def request_disband_gang():
 
         if existing:
             db.execute(
-                "UPDATE disband_requests SET status = 'pending', reason = ?, createdAt = ?, reviewedAt = NULL, reviewer = NULL WHERE gangId = ?",
-                (reason or None, now_thai(), gang["id"]),
+                "UPDATE disband_requests SET status = 'pending', reason = ?, approver = ?, createdAt = ?, reviewedAt = NULL, reviewer = NULL WHERE gangId = ?",
+                (reason or None, approver or None, now_thai(), gang["id"]),
             )
         else:
             db.execute(
-                "INSERT INTO disband_requests (gangId, reason, status, createdAt) VALUES (?, ?, 'pending', ?)",
-                (gang["id"], reason or None, now_thai()),
+                "INSERT INTO disband_requests (gangId, reason, approver, status, createdAt) VALUES (?, ?, ?, 'pending', ?)",
+                (gang["id"], reason or None, approver or None, now_thai()),
             )
         db.commit()
         return jsonify({"success": True, "message": "⚠️ ส่งเรื่องขอยุบแก๊งไปยังระบบสภากลางเรียบร้อยแล้ว กรุณารอสภาพิจารณา"})
@@ -517,26 +525,34 @@ def reject_disband_request(id):
 @app.route("/api/uniform-files", methods=["POST"])
 def create_uniform_file():
     data = request.get_json(silent=True) or {}
-    required = ["gangName", "uniformType", "fileUrl", "approver", "approverDiscord"]
+    required = ["gangName", "uniformType", "fileUrl", "approver"]
     if not all(data.get(k) for k in required):
         return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลไฟล์ชุดให้ครบถ้วน"}), 400
+
+    details = data.get("details") or {}
+    if isinstance(details, str):
+        try:
+            details = json.loads(details)
+        except Exception:
+            details = {}
 
     db = get_db()
     try:
         db.execute(
             """
             INSERT INTO uniform_files
-            (gangName, uniformType, fileUrl, approver, approverDiscord, reason, status, createdAt)
-            VALUES (?, ?, ?, ?, ?, ?, 'รอลง', ?)
+            (gangName, uniformType, fileUrl, approver, approverDiscord, reason, status, createdAt, details)
+            VALUES (?, ?, ?, ?, ?, ?, 'รอลง', ?, ?)
             """,
             (
                 data["gangName"].strip(),
                 data["uniformType"].strip(),
                 data["fileUrl"].strip(),
                 data["approver"].strip(),
-                data["approverDiscord"].strip(),
+                (data.get("approverDiscord") or "").strip(),
                 data.get("reason") or None,
                 now_thai(),
+                json.dumps(details, ensure_ascii=False) if details else None,
             ),
         )
         db.commit()
@@ -616,13 +632,20 @@ def create_welfare_request():
     if not all(data.get(k) for k in required):
         return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
 
+    details = data.get("details") or {}
+    if isinstance(details, str):
+        try:
+            details = json.loads(details)
+        except Exception:
+            details = {}
+
     db = get_db()
     try:
         db.execute(
             """
             INSERT INTO welfare_requests
-            (gangName, gangAbbreviation, requestName, discordId, welfareItem, status, createdAt)
-            VALUES (?, ?, ?, ?, ?, 'รอรับ', ?)
+            (gangName, gangAbbreviation, requestName, discordId, welfareItem, requestType, status, approver, createdAt, details)
+            VALUES (?, ?, ?, ?, ?, ?, 'รอรับ', ?, ?, ?)
             """,
             (
                 data.get("gangName") or None,
@@ -630,7 +653,10 @@ def create_welfare_request():
                 data["requestName"].strip(),
                 data["discordId"].strip(),
                 data["welfareItem"].strip(),
+                (data.get("requestType") or "receive").strip(),
+                data.get("approver") or None,
                 now_thai(),
+                json.dumps(details, ensure_ascii=False) if details else None,
             ),
         )
         db.commit()
@@ -733,6 +759,20 @@ def get_all_council_users():
         return jsonify({"success": True, "users": [row_to_dict(r) for r in rows]})
     except Exception as e:
         return jsonify({"success": False, "users": [], "message": "❌ ไม่สามารถดึงข้อมูลบัญชีสภาได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/council/names", methods=["GET"])
+def get_approved_council_names():
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT name FROM council_users WHERE status = 'อนุมัติ' ORDER BY name"
+        ).fetchall()
+        return jsonify({"success": True, "names": [r["name"] for r in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "names": [], "message": "❌ ไม่สามารถดึงรายชื่อสภาได้"}), 500
     finally:
         db.close()
 
@@ -915,7 +955,11 @@ def login_root():
         "root": {"username": ROOT_USERNAME},
     })
 
+@app.route("/", methods=["GET"])
+def get_root():
+    return jsonify({"success":"API START !"})
 
 if __name__ == "__main__":
     init_db()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 4000))
+    app.run(host="0.0.0.0", port=port, debug=True)

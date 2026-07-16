@@ -190,15 +190,58 @@ export default function CouncilAdminDashboard() {
   };
 
   const translateWelfareItem = (item: string) => {
-    switch (item) {
-      case "car": return "🚗 กล่องยานพาหนะกองกำลัง";
-      case "money": return "💰 ทุนสนับสนุนสภา (500,000 Roll)";
-      case "weapon": return "📦 คลังอาวุธยุทธภัณฑ์ (War Box)";
-      default: return item;
-    }
-  };
+  if (item === "car") return "🚗 กล่องยานพาหนะกองกำลัง";
+  if (item === "money") return "💰 ทุนสนับสนุนสภา (500,000 Roll)";
+  if (item === "weapon") return "📦 คลังอาวุธยุทธภัณฑ์ (War Box)";
+  if (item?.startsWith("อาวุธ:")) return `🔫 สวัสดิการอาวุธ ${item.replace("อาวุธ: ", "")}`;
+  if (item?.startsWith("รถ:")) return `🚗 ${item.replace("รถ: ", "")}`;
+  if (item === "เทรดสวัสดิการ") return "🔄 เทรดสวัสดิการ";
+  if (item?.includes("ออก - ออกลอย")) return "🚪 ออก - ออกลอย";
+  return item;
+};
 
-  if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-light tracking-widest animate-pulse">🔒 ตรวจสอบสิทธิ์ผู้ดูแลระบบ...</div>;
+const parseDetails = (raw: any) => {
+  if (!raw) return {};
+  if (typeof raw === "object") return raw;
+  try { return JSON.parse(raw); } catch { return {}; }
+};
+
+const welfareTypeLabel = (req: any) => {
+  const type = req.requestType;
+  if (type === "trade") return "เทรดสวัสดิการ";
+  if (type === "leave") return "ออก - ออกลอย";
+  return "รับสวัสดิการ";
+};
+
+const formatWelfareDetails = (req: any) => {
+  const details = parseDetails(req.details);
+  const type = req.requestType;
+  if (type === "receive") {
+    if (details.category === "weapon") return `อาวุธ: ${details.weaponType || "-"}`;
+    if (details.category === "car") return `รถ: ${details.carType || "-"} (${details.licensePlate || "-"}) ${details.carQuantity || "4"} คัน`;
+    return "-";
+  }
+  if (type === "trade") {
+    return `ถือ: ${details.tradeHolderName || "-"} (${details.tradeHolderDiscord || "-"}) → รับ: ${details.tradeToName || "-"} (${details.tradeToDiscord || "-"})`;
+  }
+  if (type === "leave") {
+    return `${details.leaveName || "-"} (${details.leaveDiscord || "-"}) [${details.weaponType || "-"}]`;
+  }
+  return "-";
+};
+
+const formatUniformDetails = (file: any) => {
+  const details = parseDetails(file.details);
+  const pieces = ["Suit", "Hood", "Armor", "Mod"].filter((p) => details.pieces?.[p]);
+  const piecesText = pieces.map((p) => {
+    const num = details.pieceNumbers?.[p];
+    const old = details.oldPieceNumbers?.[p];
+    return `${p}${num ? ` #${num}` : ""}${old ? ` (เดิม #${old})` : ""}`;
+  }).join(", ");
+  return { ...details, piecesText };
+};
+
+if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-light tracking-widest animate-pulse">🔒 ตรวจสอบสิทธิ์ผู้ดูแลระบบ...</div>;
 
   const navItems = [
     { id: "approve_gang", label: "อนุมัติแก๊ง", icon: "🛡️" },
@@ -475,24 +518,29 @@ export default function CouncilAdminDashboard() {
                     <table className="w-full text-xs text-left whitespace-nowrap">
                       <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06]">
                         <tr>
-                          <th className="px-6 py-4">แก๊งผู้ขอ</th>
-                          <th className="px-6 py-4">ผู้ยื่นเรื่อง (Discord ID)</th>
-                          <th className="px-6 py-4">รายการของรางวัล</th>
+                          <th className="px-6 py-4">แก๊ง</th>
+                          <th className="px-6 py-4">ผู้ยื่นเรื่อง</th>
+                          <th className="px-6 py-4">ประเภท</th>
+                          <th className="px-6 py-4">รายการ</th>
+                          <th className="px-6 py-4">รายละเอียด</th>
                           <th className="px-6 py-4 text-center">การดำเนินการ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/[0.04] text-zinc-300">
                         {welfareRequests.length === 0 ? (
-                          <tr><td colSpan={4} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีคำขอสวัสดิการค้างในระบบ</td></tr>
+                          <tr><td colSpan={6} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีคำขอสวัสดิการค้างในระบบ</td></tr>
                         ) : (
                           welfareRequests.map((req) => (
                             <tr key={req.id} className="hover:bg-white/[0.01] transition-colors">
-                              <td className="px-6 py-4 font-semibold text-white">{req.gangName} <span className="text-zinc-500">[{req.gangAbbr}]</span></td>
+                              <td className="px-6 py-4 font-semibold text-white">{req.gangName} <span className="text-zinc-500">[{req.gangAbbreviation || req.gangAbbr}]</span></td>
                               <td className="px-6 py-4">
                                 <span className="block text-zinc-300 font-medium">{req.requestName}</span>
                                 <span className="text-[10px] text-zinc-500 font-mono">{req.discordId}</span>
+                                {(() => { const d = parseDetails(req.details); return d.requesterRole ? <span className="text-[10px] text-purple-300 block">({d.requesterRole})</span> : null; })()}
                               </td>
+                              <td className="px-6 py-4 text-zinc-400">{welfareTypeLabel(req)}</td>
                               <td className="px-6 py-4 text-zinc-400">{translateWelfareItem(req.welfareItem)}</td>
+                              <td className="px-6 py-4 text-zinc-400 max-w-[260px] truncate" title={formatWelfareDetails(req)}>{formatWelfareDetails(req)}</td>
                               <td className="px-6 py-4 text-center">
                                 {req.status !== "รับไปแล้ว" && req.status !== "เอาออกแล้ว" ? (
                                   <div className="flex justify-center gap-2">
@@ -525,25 +573,38 @@ export default function CouncilAdminDashboard() {
                       <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06]">
                         <tr>
                           <th className="px-6 py-4">โมเดลชุด</th>
-                          <th className="px-6 py-4">สังกัดแก๊ง</th>
+                          <th className="px-6 py-4">สังกัด</th>
+                          <th className="px-6 py-4">การลงชุด</th>
                           <th className="px-6 py-4">ลิงก์ทรัพยากร</th>
-                          <th className="px-6 py-4">เหตุผล</th>
+                          <th className="px-6 py-4">รายละเอียด</th>
                           <th className="px-6 py-4">สถานะ</th>
                           <th className="px-6 py-4 text-center">อัปเดตเมือง</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/[0.04] text-zinc-300">
                         {uniformFiles.length === 0 ? (
-                          <tr><td colSpan={6} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีรายงานไฟล์โมเดลชุดเครื่องแบบเข้ามาในระบบ</td></tr>
+                          <tr><td colSpan={7} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีรายงานไฟล์โมเดลชุดเครื่องแบบเข้ามาในระบบ</td></tr>
                         ) : (
-                          uniformFiles.map((file) => (
+                          uniformFiles.map((file) => {
+                            const details = formatUniformDetails(file);
+                            return (
                             <tr key={file.id} className="hover:bg-white/[0.01] transition-colors">
-                              <td className="px-6 py-4 font-semibold text-white">{file.uniformType}</td>
+                              <td className="px-6 py-4 font-semibold text-white">
+                                {file.uniformType || details.piecesText || "-"}
+                                {details.colorName && <span className="block text-[10px] text-teal-300">Color: {details.colorName} ({details.hexColor})</span>}
+                                {details.contractUrl && <a href={details.contractUrl} target="_blank" rel="noreferrer" className="block text-[10px] text-blue-400 hover:underline">ดูใบสัญญา/รูปภาพ</a>}
+                              </td>
                               <td className="px-6 py-4 text-zinc-400">{file.gangName}</td>
+                              <td className="px-6 py-4">
+                                <span className="text-[10px] px-2 py-1 rounded bg-white/[0.05] text-zinc-300 border border-white/[0.10]">{details.actionType || "ลงเพิ่ม"}</span>
+                              </td>
                               <td className="px-6 py-4">
                                 <a href={file.fileUrl} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white underline underline-offset-4 transition-colors font-medium">📥 Download File</a>
                               </td>
-                              <td className="px-6 py-4 text-zinc-400 max-w-[200px] truncate">{file.reason || "-"}</td>
+                              <td className="px-6 py-4 text-zinc-400 max-w-[220px] truncate">
+                                {details.piecesText ? details.piecesText : "-"}
+                                {details.internalPhone && <span className="block text-[10px] text-zinc-500">📞 {details.internalPhone}</span>}
+                              </td>
                               <td className="px-6 py-4">
                                 <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${file.status === "ลงแล้ว" ? "bg-white/[0.08] text-white border-white/[0.1]" : "bg-white/[0.01] text-zinc-500 border-white/[0.04]"}`}>
                                   {file.status === "ลงแล้ว" ? "✓ เมืองรับแล้ว" : "⏳ รอการอิมพอร์ต"}
@@ -559,7 +620,8 @@ export default function CouncilAdminDashboard() {
                                 )}
                               </td>
                             </tr>
-                          ))
+                            );
+                          })
                         )}
                       </tbody>
                     </table>
@@ -649,23 +711,29 @@ export default function CouncilAdminDashboard() {
                       <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06]">
                         <tr>
                           <th className="px-6 py-4">ผู้ยื่นเรื่อง</th>
-                          <th className="px-6 py-4">Discord ID</th>
+                          <th className="px-6 py-4">ประเภท</th>
                           <th className="px-6 py-4">รายการของรางวัล</th>
+                          <th className="px-6 py-4">รายละเอียด</th>
                           <th className="px-6 py-4">สถานะ</th>
                           <th className="px-6 py-4">วันที่ยื่น</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/[0.04] text-zinc-300">
                         {!selectedGangAbbr ? (
-                          <tr><td colSpan={5} className="text-center py-20 text-zinc-600 font-light tracking-wide">👆 กรุณาเลือกแก๊งจากเมนูด้านบน</td></tr>
+                          <tr><td colSpan={6} className="text-center py-20 text-zinc-600 font-light tracking-wide">👆 กรุณาเลือกแก๊งจากเมนูด้านบน</td></tr>
                         ) : welfareRequests.filter(r => r.gangAbbreviation === selectedGangAbbr).length === 0 ? (
-                          <tr><td colSpan={5} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีประวัติการขอสวัสดิการของแก๊งนี้</td></tr>
+                          <tr><td colSpan={6} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีประวัติการขอสวัสดิการของแก๊งนี้</td></tr>
                         ) : (
                           welfareRequests.filter(r => r.gangAbbreviation === selectedGangAbbr).map((req) => (
                             <tr key={req.id} className="hover:bg-white/[0.01] transition-colors">
-                              <td className="px-6 py-4 font-medium text-white">{req.requestName}</td>
-                              <td className="px-6 py-4 text-zinc-500 font-mono">{req.discordId}</td>
+                              <td className="px-6 py-4 font-medium text-white">
+                                {req.requestName}
+                                <span className="block text-zinc-500 font-mono">{req.discordId}</span>
+                                {(() => { const d = parseDetails(req.details); return d.requesterRole ? <span className="text-[10px] text-purple-300 block">({d.requesterRole})</span> : null; })()}
+                              </td>
+                              <td className="px-6 py-4 text-zinc-400">{welfareTypeLabel(req)}</td>
                               <td className="px-6 py-4 text-zinc-400">{translateWelfareItem(req.welfareItem)}</td>
+                              <td className="px-6 py-4 text-zinc-400 max-w-[220px] truncate" title={formatWelfareDetails(req)}>{formatWelfareDetails(req)}</td>
                               <td className="px-6 py-4">
                                 <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${req.status === 'รับไปแล้ว' ? 'bg-white/[0.08] text-white border-white/[0.1]' : req.status === 'เอาออกแล้ว' ? 'bg-transparent text-zinc-600 border-transparent' : 'bg-white/[0.01] text-zinc-500 border-white/[0.04]'}`}>
                                   {req.status === 'รับไปแล้ว' ? '✓ ส่งมอบแล้ว' : req.status === 'เอาออกแล้ว' ? '✕ ยกเลิกคำขอ' : '⏳ รอรับ'}

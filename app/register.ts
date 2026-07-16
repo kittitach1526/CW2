@@ -1,9 +1,9 @@
 "use server";
 
-const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:5000";
+const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:4000";
 
 const ROOT_USERNAME = "root";
-const ROOT_PASSWORD = "changeme123";
+const ROOT_PASSWORD = "p@ssw0rd";
 
 interface WelfareRequest {
   id: number;
@@ -14,6 +14,7 @@ interface WelfareRequest {
   welfareItem: string;
   status: string;
   createdAt: string;
+  approver?: string;
 }
 
 type ApiPayload = Record<string, string | number | boolean | null | undefined>;
@@ -59,11 +60,11 @@ async function apiFetch(
 // ---------------------------------------------------------------------------
 // Disband Requests
 // ---------------------------------------------------------------------------
-export async function requestDisbandGang(abbreviation: string, reason?: string) {
+export async function requestDisbandGang(abbreviation: string, reason?: string, approver?: string) {
   if (!abbreviation) {
     return { success: false, message: "❌ ไม่พบข้อมูลชื่อย่อแก๊ง" };
   }
-  return apiFetch("POST", "/api/gangs/disband", { abbreviation, reason });
+  return apiFetch("POST", "/api/gangs/disband", { abbreviation, reason, approver });
 }
 
 export async function getPendingDisbandRequests() {
@@ -139,10 +140,17 @@ export async function rejectGangEditRequest(id: number, reviewer: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Council Names (used for dropdowns like uniform approver)
+// ---------------------------------------------------------------------------
+export async function getCouncilNames() {
+  return apiFetch("GET", "/api/council/names");
+}
+
+// ---------------------------------------------------------------------------
 // Uniform Files
 // ---------------------------------------------------------------------------
-export async function createUniformFile(formData: FormData) {
-  const payload = formDataToObject(formData);
+export async function createUniformFile(data: FormData | Record<string, unknown>) {
+  const payload = data instanceof FormData ? formDataToObject(data) : (data as ApiPayload);
   return apiFetch("POST", "/api/uniform-files", payload);
 }
 
@@ -171,8 +179,8 @@ export async function updateUniformStatus(
 // ---------------------------------------------------------------------------
 // Welfare Requests
 // ---------------------------------------------------------------------------
-export async function createWelfareRequest(formData: FormData) {
-  const payload = formDataToObject(formData);
+export async function createWelfareRequest(data: FormData | Record<string, unknown>) {
+  const payload = data instanceof FormData ? formDataToObject(data) : (data as ApiPayload);
   return apiFetch("POST", "/api/welfare", payload);
 }
 

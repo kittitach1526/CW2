@@ -4,8 +4,10 @@ import random
 import sys
 import time
 
+import os
+
 HOST = "127.0.0.1"
-PORT = 5000
+PORT = int(os.environ.get("PORT", 4000))
 
 
 def request(method, path, body=None):
@@ -221,8 +223,15 @@ def run():
     s, b = request("DELETE", f"/api/admin/{admin_id}")
     all_ok &= expect(s, b, 200, lambda x: x.get("success"), "delete admin user")
 
+    # login with seeded root users for council and admin
+    s, b = request("POST", "/api/council/login", {"username": "root", "password": "p@ssw0rd"})
+    all_ok &= expect(s, b, 200, lambda x: x.get("success") and x.get("council"), "login root council user")
+
+    s, b = request("POST", "/api/admin/login", {"username": "root", "password": "p@ssw0rd"})
+    all_ok &= expect(s, b, 200, lambda x: x.get("success") and x.get("admin"), "login root admin user")
+
     # root login
-    s, b = request("POST", "/api/root/login", {"username": "root", "password": "changeme123"})
+    s, b = request("POST", "/api/root/login", {"username": "root", "password": "p@ssw0rd"})
     all_ok &= expect(s, b, 200, lambda x: x.get("success") and x.get("root"), "root login")
 
     s, b = request("POST", "/api/root/login", {"username": "root", "password": "wrong"})
