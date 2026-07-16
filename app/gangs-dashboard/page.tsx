@@ -13,6 +13,8 @@ import {
   getWelfareRequestsByGang,
   requestDisbandGang,
   getDisbandRequestByGang,
+  requestPauseGang,
+  getPauseRequestByGang,
   getCouncilNames,
 } from "../register";
 import ImageUpload from "../components/ImageUpload";
@@ -20,13 +22,14 @@ import ImageUpload from "../components/ImageUpload";
 export default function GangDashboard() {
   const router = useRouter();
   const [gangData, setGangData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "edit" | "welfare" | "upload_uniform" | "view_uniforms" | "disband">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "edit" | "welfare" | "upload_uniform" | "view_uniforms" | "pause" | "disband">("overview");
   const [loading, setLoading] = useState(false);
   const [colorTheme, setColorTheme] = useState("#3b82f6");
   const [uniformFiles, setUniformFiles] = useState<any[]>([]);
   const [welfareRequests, setWelfareRequests] = useState<any[]>([]);
   const [pendingEdit, setPendingEdit] = useState<any>(null);
   const [pendingDisband, setPendingDisband] = useState<any>(null);
+  const [pendingPause, setPendingPause] = useState<any>(null);
 
   // รายชื่อสภาสำหรับ dropdown ผู้อนุมัติ
   const [councilNames, setCouncilNames] = useState<string[]>([]);
@@ -119,11 +122,56 @@ export default function GangDashboard() {
     }
   };
 
+  const handlePauseGang = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!gangData?.abbreviation) return;
+
+    const formData = new FormData(e.currentTarget);
+    const reason = formData.get("reason") as string;
+    const approver = formData.get("approver") as string;
+    const durationDays = Number(formData.get("durationDays"));
+
+    if (!reason || !approver || !durationDays) {
+      alert("❌ กรุณากรอกเหตุผล เลือกสภา และระบุจำนวนวันพัก");
+      return;
+    }
+    if (durationDays < 1 || durationDays > 30) {
+      alert("❌ สามารถพักแก๊งได้สูงสุดไม่เกิน 30 วัน");
+      return;
+    }
+
+    if (!confirm(`❗ ยืนยันการส่งเรื่องขอพักแก๊ง ${durationDays} วัน ใช่หรือไม่ คำขอนี้จะส่งไปยังสภากลางเพื่อพิจารณา`)) return;
+
+    setLoading(true);
+    try {
+      const result = await requestPauseGang(gangData.abbreviation, reason, approver, durationDays);
+      setLoading(false);
+
+      alert(result.message);
+      if (result.success) {
+        const res = await getPauseRequestByGang(gangData.id);
+        if (res.success) setPendingPause(res.request);
+      }
+    } catch (error) {
+      console.error(error);
+      setLoading(false);
+      alert("❌ ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้ในขณะนี้");
+    }
+  };
+
   // โหลดคำขอยุบแก๊งล่าสุด
   const loadPendingDisband = async (id: number) => {
     const result = await getDisbandRequestByGang(id);
     if (result.success) {
       setPendingDisband(result.request);
+    }
+  };
+
+  // โหลดคำขอพักแก๊งล่าสุด
+  const loadPendingPause = async (id: number) => {
+    const result = await getPauseRequestByGang(id);
+    if (result.success) {
+      setPendingPause(result.request);
     }
   };
 
@@ -177,6 +225,9 @@ export default function GangDashboard() {
     if (activeTab === "welfare" && gangData?.abbreviation) {
       loadWelfareRequests(gangData.abbreviation);
     }
+    if (activeTab === "pause" && gangData?.id) {
+      loadPendingPause(gangData.id);
+    }
   }, [activeTab, gangData]);
 
   // ➕ โหลดข้อมูลสรุปทันทีหลังเข้าสู่ระบบ เพื่อใช้แสดงสถิติในหน้าภาพรวม
@@ -186,6 +237,7 @@ export default function GangDashboard() {
       loadWelfareRequests(gangData.abbreviation);
       loadPendingEdit(gangData.id);
       loadPendingDisband(gangData.id);
+      loadPendingPause(gangData.id);
     }
   }, [gangData?.id]);
 
@@ -471,6 +523,7 @@ export default function GangDashboard() {
     { id: "welfare", label: "ยื่นสวัสดิการ", icon: "🎁" },
     { id: "upload_uniform", label: "เพิ่มไฟล์ชุด", icon: "➕" },
     { id: "view_uniforms", label: "ดูไฟล์ทั้งหมด", icon: "📁" },
+    { id: "pause", label: "พักแก๊ง", icon: "⏸️" },
     { id: "disband", label: "ยุบแก๊ง", icon: "⚠️" },
   ] as const;
 
@@ -478,6 +531,7 @@ export default function GangDashboard() {
   const pendingWelfareCount = welfareRequests.filter((r) => r.status !== "รับไปแล้ว" && r.status !== "เอาออกแล้ว").length;
   const pendingUniformCount = uniformFiles.filter((f) => f.status !== "ลงแล้ว").length;
   const pendingDisbandCount = pendingDisband?.status === "pending" ? 1 : 0;
+  const pendingPauseCount = pendingPause?.status === "pending" || pendingPause?.status === "approved" ? 1 : 0;
 
   return (
     <div
@@ -529,8 +583,14 @@ export default function GangDashboard() {
 
           <div className="mt-auto flex flex-col gap-3 pt-6 border-t border-white/[0.06]">
             <div className="text-[10px] text-zinc-500 tracking-wide uppercase">สถานะแก๊ง</div>
-            <span className={`text-xs font-bold px-2.5 py-1 rounded-md w-fit ${gangData.status === "pending" ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"}`}>
-              {gangData.status === "pending" ? "⏳ รอการอนุมัติ" : "✅ อนุมัติแล้ว"}
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-md w-fit ${
+              gangData.status === "pending" ? "bg-amber-500/20 text-amber-300" :
+              gangData.status === "พัก" ? "bg-blue-500/20 text-blue-300" :
+              "bg-green-500/20 text-green-300"
+            }`}>
+              {gangData.status === "pending" ? "⏳ รอการอนุมัติ" :
+               gangData.status === "พัก" ? "⏸️ กำลังพัก" :
+               "✅ อนุมัติแล้ว"}
             </span>
             <button onClick={handleLogout} className="w-full px-4 py-2 text-xs font-medium bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-white/[0.06] rounded-xl transition-all duration-200 active:scale-95 shadow-sm">
               🔒 ออกจากระบบ
@@ -574,7 +634,7 @@ export default function GangDashboard() {
           </div>
 
           {/* Stat Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 w-full">
             <div className="flex flex-col gap-1 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider">รหัสลงทะเบียน</span>
               <span className="text-2xl font-bold text-white font-mono">#000{gangData.id}</span>
@@ -595,6 +655,10 @@ export default function GangDashboard() {
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider">คำขอยุบรอตรวจ</span>
               <span className="text-2xl font-bold text-red-400">{pendingDisbandCount}</span>
             </div>
+            <div className="flex flex-col gap-1 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wider">พัก/รอพัก</span>
+              <span className="text-2xl font-bold text-blue-400">{pendingPauseCount}</span>
+            </div>
           </div>
 
           {/* Workspace Container */}
@@ -607,8 +671,14 @@ export default function GangDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="p-4 rounded-xl bg-white/5 border border-white/5">
                   <span className="text-xs text-zinc-400 block mb-1">สถานะแก๊งในเมือง</span>
-                  <span className={`text-sm font-bold px-2.5 py-1 rounded-md ${gangData.status === "pending" ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"}`}>
-                    {gangData.status === "pending" ? "⏳ รอการอนุมัติ (Pending)" : "✅ อนุมัติแล้ว (Approved)"}
+                  <span className={`text-sm font-bold px-2.5 py-1 rounded-md ${
+                    gangData.status === "pending" ? "bg-amber-500/20 text-amber-300" :
+                    gangData.status === "พัก" ? "bg-blue-500/20 text-blue-300" :
+                    "bg-green-500/20 text-green-300"
+                  }`}>
+                    {gangData.status === "pending" ? "⏳ รอการอนุมัติ (Pending)" :
+                     gangData.status === "พัก" ? "⏸️ กำลังพัก" :
+                     "✅ อนุมัติแล้ว (Approved)"}
                   </span>
                 </div>
                 <div className="p-4 rounded-xl bg-white/5 border border-white/5">
@@ -651,7 +721,9 @@ export default function GangDashboard() {
                   {pendingWelfareCount > 0 && <li>🎁 มีคำขอสวัสดิการ {pendingWelfareCount} รายการรอรับ</li>}
                   {pendingUniformCount > 0 && <li>👕 มีไฟล์ชุด {pendingUniformCount} รายการรอนำเข้า</li>}
                   {pendingDisbandCount > 0 && <li>⚠️ มีคำขอยุบแก๊งรอพิจารณา</li>}
-                  {pendingEdit?.status !== "pending" && pendingWelfareCount === 0 && pendingUniformCount === 0 && pendingDisbandCount === 0 && <li>✅ ไม่มีคำขอใดๆ รอดำเนินการ</li>}
+                  {pendingPause?.status === "pending" && <li>⏸️ มีคำขอพักแก๊งรอพิจารณา</li>}
+                  {pendingPause?.status === "approved" && <li>⏸️ แก๊งกำลังพัก จนถึง {new Date((pendingPause.endDate || "").replace(" ", "T")).toLocaleString("th-TH")}</li>}
+                  {pendingEdit?.status !== "pending" && pendingWelfareCount === 0 && pendingUniformCount === 0 && pendingDisbandCount === 0 && !pendingPause && <li>✅ ไม่มีคำขอใดๆ รอดำเนินการ</li>}
                 </ul>
               </div>
             </div>
@@ -1356,7 +1428,77 @@ export default function GangDashboard() {
             </div>
           )}
 
-          {/* แท็บ 6: ยุบแก๊ง */}
+          {/* แท็บ 6: พักแก๊ง */}
+          {activeTab === "pause" && (
+            <div className="flex flex-col gap-5">
+              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                <h2 className="text-lg font-bold text-blue-400 mb-1">⏸️ ขอพักแก๊งชั่วคราว</h2>
+                <p className="text-xs text-blue-200/70">สามารถพักแก๊งได้สูงสุด 30 วัน หลังอนุมัติสภาจะกด "รายงานตัวแล้ว" เมื่อแก๊งรายงานตัว</p>
+              </div>
+
+              {pendingPause?.status === "pending" || pendingPause?.status === "approved" ? (
+                <div className={`p-4 rounded-xl border text-sm ${
+                  pendingPause.status === "approved"
+                    ? "bg-blue-500/10 border-blue-500/20 text-blue-300"
+                    : "bg-amber-500/10 border-amber-500/20 text-amber-300"
+                }`}>
+                  {pendingPause.status === "approved" ? (
+                    <>
+                      ⏸️ แก๊งของคุณกำลังพักอยู่
+                      <span className="block text-xs mt-1 text-blue-200/70">
+                        พักจนถึง {new Date((pendingPause.endDate || "").replace(" ", "T")).toLocaleString("th-TH")}
+                      </span>
+                    </>
+                  ) : (
+                    <>⏳ คำขอพักแก๊งของคุณกำลังรอการพิจารณาจากสภากลาง</>
+                  )}
+                </div>
+              ) : (
+                <form onSubmit={handlePauseGang} className="flex flex-col gap-5 w-full text-white">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-zinc-200">ชื่อสภาที่อนุมัติ</label>
+                    <select
+                      name="approver"
+                      className="w-full h-11 px-4 rounded-xl bg-zinc-900 border border-white/10 text-sm text-white focus:border-blue-400 focus:outline-none"
+                      required
+                    >
+                      <option value="">-- เลือกสภา --</option>
+                      {councilNames.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-zinc-200">จำนวนวันที่ต้องการพัก (1-30 วัน)</label>
+                    <input
+                      type="number"
+                      name="durationDays"
+                      min={1}
+                      max={30}
+                      placeholder="เช่น 7"
+                      className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-zinc-200">เหตุผลการขอพักแก๊ง</label>
+                    <textarea name="reason" rows={3} placeholder="ระบุเหตุผลที่ต้องการพักแก๊ง" className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm resize-none" />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="h-11 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-sm transition-all text-white disabled:opacity-50"
+                  >
+                    {loading ? "กำลังส่งเรื่อง..." : "ยืนยันการส่งเรื่องพักแก๊ง"}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* แท็บ 7: ยุบแก๊ง */}
           {activeTab === "disband" && (
             <div className="flex flex-col gap-5">
               <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">

@@ -104,6 +104,22 @@ def init_db():
             FOREIGN KEY (gangId) REFERENCES gangs(id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS pause_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gangId INTEGER NOT NULL,
+            reason TEXT,
+            approver TEXT,
+            durationDays INTEGER,
+            startDate TEXT,
+            endDate TEXT,
+            status TEXT DEFAULT 'pending',
+            createdAt TEXT,
+            reviewedAt TEXT,
+            reviewer TEXT,
+            reportedAt TEXT,
+            FOREIGN KEY (gangId) REFERENCES gangs(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS welfare_requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             gangName TEXT,

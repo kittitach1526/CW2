@@ -15,12 +15,16 @@ import {
   getPendingDisbandRequests,
   approveDisbandRequest,
   rejectDisbandRequest,
+  getPauseRequests,
+  approvePauseRequest,
+  rejectPauseRequest,
+  reportPauseRequest,
 } from "../register";
 
 export default function CouncilAdminDashboard() {
   const router = useRouter();
   const [adminData, setAdminData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"approve_gang" | "approve_welfare" | "approve_uniform" | "approve_gang_edit" | "approve_disband" | "gang_list" | "welfare_by_gang">("approve_gang");
+  const [activeTab, setActiveTab] = useState<"approve_gang" | "approve_welfare" | "approve_uniform" | "approve_gang_edit" | "approve_disband" | "approve_pause" | "gang_list" | "welfare_by_gang">("approve_gang");
   const [loading, setLoading] = useState(false);
   const [selectedGangAbbr, setSelectedGangAbbr] = useState("");
   
@@ -30,6 +34,7 @@ export default function CouncilAdminDashboard() {
   const [uniformFiles, setUniformFiles] = useState<any[]>([]);
   const [editRequests, setEditRequests] = useState<any[]>([]);
   const [disbandRequests, setDisbandRequests] = useState<any[]>([]);
+  const [pauseRequests, setPauseRequests] = useState<any[]>([]);
 
   // 1. ตรวจสอบสิทธิ์ผู้ดูแลระบบสภากลาง
   useEffect(() => {
@@ -91,6 +96,15 @@ export default function CouncilAdminDashboard() {
             setDisbandRequests(result.requests || []);
           } else {
             setDisbandRequests([]);
+          }
+        }
+
+        if (activeTab === "approve_pause") {
+          const result = await getPauseRequests();
+          if (result.success) {
+            setPauseRequests(result.requests || []);
+          } else {
+            setPauseRequests([]);
           }
         }
       } catch (error) {
@@ -189,6 +203,25 @@ export default function CouncilAdminDashboard() {
     }
   };
 
+  const handlePauseAction = async (id: number, action: "approve" | "reject" | "report") => {
+    const reviewer = adminData?.name || adminData?.username || "สภากลาง";
+    let result;
+    if (action === "approve") {
+      result = await approvePauseRequest(id, reviewer);
+    } else if (action === "reject") {
+      result = await rejectPauseRequest(id, reviewer);
+    } else {
+      result = await reportPauseRequest(id);
+    }
+
+    if (result.success) {
+      alert(result.message);
+      setPauseRequests((prev) => prev.filter((r) => r.id !== id));
+    } else {
+      alert(result.message);
+    }
+  };
+
   const translateWelfareItem = (item: string) => {
   if (item === "car") return "🚗 กล่องยานพาหนะกองกำลัง";
   if (item === "money") return "💰 ทุนสนับสนุนสภา (500,000 Roll)";
@@ -247,6 +280,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
     { id: "approve_gang", label: "อนุมัติแก๊ง", icon: "🛡️" },
     { id: "approve_gang_edit", label: "อนุมัติแก้ไขแก๊ง", icon: "✏️" },
     { id: "approve_disband", label: "อนุมัติยุบแก๊ง", icon: "⚠️" },
+    { id: "approve_pause", label: "อนุมัติพักแก๊ง", icon: "⏸️" },
     { id: "approve_welfare", label: "แจกสวัสดิการ", icon: "🎁" },
     { id: "approve_uniform", label: "จัดการไฟล์ชุด", icon: "👕" },
     { id: "gang_list", label: "รายชื่อแก๊งทั้งหมด", icon: "📋" },
@@ -256,6 +290,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
   const pendingGangCount = gangsList.filter((g) => g.status === "pending" || g.status === "รอยุบ").length;
   const pendingEditCount = editRequests.filter((r) => r.status === "pending").length;
   const pendingDisbandCount = disbandRequests.filter((r) => r.status === "pending").length;
+  const pendingPauseCount = pauseRequests.length;
   const pendingWelfareCount = welfareRequests.filter((r) => r.status !== "รับไปแล้ว" && r.status !== "เอาออกแล้ว").length;
   const pendingUniformCount = uniformFiles.filter((f) => f.status !== "ลงแล้ว").length;
 
@@ -340,7 +375,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
           </div>
 
           {/* Stat Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 w-full">
             <div className="flex flex-col gap-1 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider">แก๊งทั้งหมด</span>
               <span className="text-2xl font-bold text-white">{gangsList.length}</span>
@@ -364,6 +399,10 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
             <div className="flex flex-col gap-1 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
               <span className="text-[10px] text-zinc-500 uppercase tracking-wider">ไฟล์ชุดรอนำเข้า</span>
               <span className="text-2xl font-bold text-amber-300">{pendingUniformCount}</span>
+            </div>
+            <div className="flex flex-col gap-1 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+              <span className="text-[10px] text-zinc-500 uppercase tracking-wider">พัก/รอพัก</span>
+              <span className="text-2xl font-bold text-blue-400">{pendingPauseCount}</span>
             </div>
           </div>
 
@@ -508,7 +547,65 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                 </div>
               )}
 
-              {/* MENU 4: ยืนยันสวัสดิการ */}
+              {/* MENU 4: อนุมัติพักแก๊ง */}
+              {activeTab === "approve_pause" && (
+                <div className="flex flex-col w-full">
+                  <div className="p-5 border-b border-white/[0.06] bg-white/[0.01]">
+                    <h2 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">⏸️ คำขอพักแก๊ง</h2>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left whitespace-nowrap">
+                      <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06] font-medium">
+                        <tr>
+                          <th className="px-6 py-4">แก๊ง</th>
+                          <th className="px-6 py-4">หัวหน้า</th>
+                          <th className="px-6 py-4">เหตุผล</th>
+                          <th className="px-6 py-4">สภาที่เลือก</th>
+                          <th className="px-6 py-4">ระยะเวลา</th>
+                          <th className="px-6 py-4">สถานะ</th>
+                          <th className="px-6 py-4 text-center">จัดการคำขอ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.04] text-zinc-300">
+                        {pauseRequests.length === 0 ? (
+                          <tr><td colSpan={7} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีคำขอพักแก๊งค้างในระบบ</td></tr>
+                        ) : (
+                          pauseRequests.map((req) => (
+                            <tr key={req.id} className="hover:bg-white/[0.01] transition-colors">
+                              <td className="px-6 py-4 font-bold text-white">{req.gang?.fullName} <span className="text-zinc-500 font-mono font-normal">[{req.gang?.abbreviation}]</span></td>
+                              <td className="px-6 py-4 text-zinc-400">{req.gang?.leader}</td>
+                              <td className="px-6 py-4 text-zinc-400 max-w-[200px] truncate">{req.reason || "-"}</td>
+                              <td className="px-6 py-4 text-zinc-400">{req.approver || "-"}</td>
+                              <td className="px-6 py-4 text-zinc-400">{req.durationDays ? `${req.durationDays} วัน` : "-"}</td>
+                              <td className="px-6 py-4">
+                                <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${
+                                  req.status === 'approved'
+                                    ? 'bg-blue-500/10 text-blue-300 border-blue-500/20'
+                                    : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                                }`}>
+                                  {req.status === 'approved' ? `⏸️ พักจนถึง ${new Date((req.endDate || "").replace(" ", "T")).toLocaleString("th-TH")}` : '⏳ รออนุมัติ'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-center flex justify-center gap-2">
+                                {req.status === "pending" ? (
+                                  <>
+                                    <button onClick={() => handlePauseAction(req.id, "approve")} className="px-4 py-1.5 bg-white/[0.08] hover:bg-white hover:text-black font-medium rounded-lg border border-white/[0.08] transition-all text-[11px] shadow-sm">อนุมัติ</button>
+                                    <button onClick={() => handlePauseAction(req.id, "reject")} className="px-4 py-1.5 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 border border-white/[0.04] rounded-lg transition-all text-[11px]">ปฏิเสธ</button>
+                                  </>
+                                ) : req.status === "approved" ? (
+                                  <button onClick={() => handlePauseAction(req.id, "report")} className="px-4 py-1.5 bg-blue-500/10 hover:bg-blue-500 hover:text-white text-blue-300 font-medium rounded-lg border border-blue-500/20 transition-all text-[11px] shadow-sm">รายงานตัวแล้ว</button>
+                                ) : null}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* MENU 5: ยืนยันสวัสดิการ */}
               {activeTab === "approve_welfare" && (
                 <div className="flex flex-col w-full">
                   <div className="p-5 border-b border-white/[0.06] bg-white/[0.01]">

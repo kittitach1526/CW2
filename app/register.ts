@@ -84,6 +84,41 @@ export async function rejectDisbandRequest(id: number, reviewer: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Pause Requests
+// ---------------------------------------------------------------------------
+export async function requestPauseGang(
+  abbreviation: string,
+  reason: string,
+  approver: string,
+  durationDays: number
+) {
+  if (!abbreviation) {
+    return { success: false, message: "❌ ไม่พบข้อมูลชื่อย่อแก๊ง" };
+  }
+  return apiFetch("POST", "/api/gangs/pause", { abbreviation, reason, approver, durationDays });
+}
+
+export async function getPauseRequestByGang(gangId: number) {
+  return apiFetch("GET", `/api/gangs/${gangId}/pause-request`);
+}
+
+export async function getPauseRequests() {
+  return apiFetch("GET", "/api/pause-requests");
+}
+
+export async function approvePauseRequest(id: number, reviewer: string) {
+  return apiFetch("POST", `/api/pause-requests/${id}/approve`, { reviewer });
+}
+
+export async function rejectPauseRequest(id: number, reviewer: string) {
+  return apiFetch("POST", `/api/pause-requests/${id}/reject`, { reviewer });
+}
+
+export async function reportPauseRequest(id: number) {
+  return apiFetch("POST", `/api/pause-requests/${id}/report`);
+}
+
+// ---------------------------------------------------------------------------
 // Gang Registration / Login
 // ---------------------------------------------------------------------------
 export async function createRegistration(formData: FormData) {
@@ -102,7 +137,7 @@ export async function getAllGangs() {
 
 export async function updateGangStatus(
   id: number,
-  status: "approved" | "disbanded" | "pending" | "รอยุบ"
+  status: "approved" | "disbanded" | "pending" | "รอยุบ" | "พัก"
 ) {
   return apiFetch("PATCH", `/api/gangs/${id}/status`, { status });
 }
