@@ -5,7 +5,7 @@ export default function Home() {
   return (
     // 1. เพิ่ม Background Image และ Overlay สีเข้ม/จาง เพื่อให้ข้อความอ่านง่าย
     <div 
-      className="relative flex flex-col items-center justify-center min-h-screen bg-cover bg-center bg-no-repeat font-sans antialiased"
+      className="relative flex flex-col items-center justify-center min-h-screen bg-cover bg-center bg-no-repeat bg-fixed font-sans antialiased"
       style={{ backgroundImage: "url('COUNCIL.PNG')" }} // 👈 ใส่พาธรูปภาพของคุณตรงนี้
     >
       {/* Dark / Light Overlay ชั้นกรองแสงเพื่อให้พื้นหลังไม่แย่งซีนข้อความ */}

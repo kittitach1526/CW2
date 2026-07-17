@@ -69,6 +69,7 @@ def init_db():
             coLeader1Phone TEXT,
             coLeader2Phone TEXT,
             type TEXT,
+            logoUrl TEXT,
             editReason TEXT,
             approver TEXT,
             newPassword TEXT,
@@ -134,6 +135,35 @@ def init_db():
             details TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS welfare_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            type TEXT NOT NULL,
+            active INTEGER DEFAULT 1,
+            createdAt TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS welfare_seasons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            kind TEXT DEFAULT 'regular',
+            startDate TEXT,
+            endDate TEXT,
+            active INTEGER DEFAULT 1,
+            allowedTypes TEXT,
+            gangSelection TEXT DEFAULT 'all',
+            selectedGangs TEXT,
+            createdAt TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS welfare_season_weapons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            seasonId INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            weapon TEXT NOT NULL,
+            FOREIGN KEY (seasonId) REFERENCES welfare_seasons(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS council_users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -162,6 +192,7 @@ def init_db():
     # Seed default root users for testing
     seed_root_users(conn)
     seed_council_users(conn)
+    seed_welfare_items(conn)
 
     conn.close()
 
@@ -190,6 +221,7 @@ def migrate_db(conn):
     add_column("gang_edit_requests", "coLeader1Phone", "TEXT")
     add_column("gang_edit_requests", "coLeader2Phone", "TEXT")
     add_column("gang_edit_requests", "approver", "TEXT")
+    add_column("gang_edit_requests", "logoUrl", "TEXT")
 
     # If an older schema made approverDiscord NOT NULL, normalize it so new forms can leave it empty
     try:
@@ -243,6 +275,25 @@ def seed_council_users(conn):
         print("Seeded council users:", len(COUNCIL_USER_NAMES))
     except Exception as e:
         print("Seed council users failed:", e)
+
+
+def seed_welfare_items(conn):
+    try:
+        count = conn.execute("SELECT COUNT(*) FROM welfare_items").fetchone()[0]
+        if count == 0:
+            created_at = now_thai()
+            conn.execute(
+                "INSERT INTO welfare_items (name, type, active, createdAt) VALUES (?, ?, 1, ?)",
+                ("สวัสดิการอาวุธ", "weapon", created_at),
+            )
+            conn.execute(
+                "INSERT INTO welfare_items (name, type, active, createdAt) VALUES (?, ?, 1, ?)",
+                ("สวัสดิการรถ", "car", created_at),
+            )
+            conn.commit()
+            print("Seeded welfare items")
+    except Exception as e:
+        print(f"Seed welfare items failed: {e}")
 
 
 def seed_root_users(conn):

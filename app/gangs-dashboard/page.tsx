@@ -16,13 +16,14 @@ import {
   requestPauseGang,
   getPauseRequestByGang,
   getCouncilNames,
+  getWelfareItems,
 } from "../register";
 import ImageUpload from "../components/ImageUpload";
 
 export default function GangDashboard() {
   const router = useRouter();
   const [gangData, setGangData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "edit" | "welfare" | "upload_uniform" | "view_uniforms" | "pause" | "disband">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "edit" | "welfare" | "upload_uniform" | "view_uniforms" | "leave" | "pause" | "disband">("overview");
   const [loading, setLoading] = useState(false);
   const [colorTheme, setColorTheme] = useState("#3b82f6");
   const [uniformFiles, setUniformFiles] = useState<any[]>([]);
@@ -34,8 +35,18 @@ export default function GangDashboard() {
   // รายชื่อสภาสำหรับ dropdown ผู้อนุมัติ
   const [councilNames, setCouncilNames] = useState<string[]>([]);
 
+  // รายการสวัสดิการจากฐานข้อมูล
+  const [welfareItems, setWelfareItems] = useState<{ id: number; name: string; type: string }[]>([]);
+
+  const loadWelfareItems = async () => {
+    const result = await getWelfareItems();
+    if (result.success && Array.isArray(result.items)) {
+      setWelfareItems(result.items);
+    }
+  };
+
   // แท็บย่อยของสวัสดิการ
-  const [welfareSubTab, setWelfareSubTab] = useState<"receive" | "trade" | "leave">("receive");
+  const [welfareSubTab, setWelfareSubTab] = useState<"receive" | "trade">("receive");
 
   // ฟอร์มเพิ่มไฟล์ชุด
   const [uniformForm, setUniformForm] = useState({
@@ -57,21 +68,35 @@ export default function GangDashboard() {
   const [welfareForm, setWelfareForm] = useState({
     requesterName: "",
     requesterDiscord: "",
+    requesterPhone: "",
     requesterRole: "Leader" as "Leader" | "Deputy",
     receiverName: "",
     receiverDiscord: "",
-    category: "weapon" as "weapon" | "car",
-    weaponType: "up_weapon" as "up_weapon" | "down_weapon",
-    carType: "Rebla" as "Rebla" | "Zeno" | "Komoda",
+    welfareItemId: "",
+    welfareItemName: "",
+    category: "" as string,
+    carType: "Rebla" as string,
     licensePlate: "",
     carQuantity: "4",
     tradeHolderName: "",
     tradeHolderDiscord: "",
+    tradeHolderPhone: "",
+    tradeHolderWelfare: "",
     tradeToName: "",
     tradeToDiscord: "",
+    tradeToPhone: "",
+    approver: "",
+  });
+
+  // ฟอร์มออก - ออกลอย (แยกเป็นเมนูหลัก)
+  const [leaveForm, setLeaveForm] = useState({
+    requesterName: "",
+    requesterDiscord: "",
+    requesterPhone: "",
+    requesterRole: "Leader" as "Leader" | "Deputy",
     leaveName: "",
     leaveDiscord: "",
-    leaveWeaponType: "up_weapon" as "up_weapon" | "down_weapon",
+    leavePhone: "",
     approver: "",
   });
 
@@ -222,8 +247,11 @@ export default function GangDashboard() {
     if (activeTab === "view_uniforms") {
       loadUniformFiles();
     }
-    if (activeTab === "welfare" && gangData?.abbreviation) {
+    if ((activeTab === "welfare" || activeTab === "leave") && gangData?.abbreviation) {
       loadWelfareRequests(gangData.abbreviation);
+    }
+    if (activeTab === "welfare") {
+      loadWelfareItems();
     }
     if (activeTab === "pause" && gangData?.id) {
       loadPendingPause(gangData.id);
@@ -336,8 +364,8 @@ export default function GangDashboard() {
     e.preventDefault();
     if (!gangData) return;
 
-    if (!welfareForm.requesterName || !welfareForm.requesterDiscord) {
-      alert("❌ กรุณากรอกชื่อและเลขดิสคอร์ดผู้ยื่นเรื่อง");
+    if (!welfareForm.requesterName || !welfareForm.requesterDiscord || !welfareForm.requesterPhone) {
+      alert("❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรผู้ยื่นเรื่อง");
       return;
     }
 
@@ -346,9 +374,9 @@ export default function GangDashboard() {
       return;
     }
 
-    let requestType: "receive" | "trade" | "leave" = "receive";
+    let requestType: "receive" | "trade" = "receive";
     let welfareItem = "";
-    const details: any = { requesterRole: welfareForm.requesterRole };
+    const details: any = { requesterRole: welfareForm.requesterRole, requesterPhone: welfareForm.requesterPhone };
 
     if (welfareSubTab === "receive") {
       requestType = "receive";
@@ -356,13 +384,21 @@ export default function GangDashboard() {
         alert("❌ กรุณากรอกชื่อและเลขดิสคอร์ดคนรับสวัสดิการ");
         return;
       }
+      if (!welfareForm.welfareItemId) {
+        alert("❌ กรุณาเลือกประเภทสวัสดิการ");
+        return;
+      }
+      const selectedItem = welfareItems.find((i) => String(i.id) === welfareForm.welfareItemId);
+      if (!selectedItem) {
+        alert("❌ ไม่พบรายการสวัสดิการที่เลือก");
+        return;
+      }
       details.receiverName = welfareForm.receiverName;
       details.receiverDiscord = welfareForm.receiverDiscord;
-      details.category = welfareForm.category;
-      if (welfareForm.category === "weapon") {
-        details.weaponType = welfareForm.weaponType;
-        welfareItem = `อาวุธ: ${welfareForm.weaponType}`;
-      } else {
+      details.welfareItemId = selectedItem.id;
+      details.welfareItemName = selectedItem.name;
+      details.category = selectedItem.type;
+      if (selectedItem.type === "car") {
         if (!welfareForm.licensePlate) {
           alert("❌ กรุณากรอกเลขทะเบียนรถ");
           return;
@@ -370,34 +406,30 @@ export default function GangDashboard() {
         details.carType = welfareForm.carType;
         details.licensePlate = welfareForm.licensePlate;
         details.carQuantity = welfareForm.carQuantity;
-        welfareItem = `รถ: ${welfareForm.carType} (${welfareForm.licensePlate}) ${welfareForm.carQuantity} คัน`;
       }
+      welfareItem = selectedItem.name;
     } else if (welfareSubTab === "trade") {
       requestType = "trade";
       if (
         !welfareForm.tradeHolderName ||
         !welfareForm.tradeHolderDiscord ||
+        !welfareForm.tradeHolderPhone ||
+        !welfareForm.tradeHolderWelfare ||
         !welfareForm.tradeToName ||
-        !welfareForm.tradeToDiscord
+        !welfareForm.tradeToDiscord ||
+        !welfareForm.tradeToPhone
       ) {
         alert("❌ กรุณากรอกข้อมูลผู้ถือสวัสดิการและผู้รับเทรดให้ครบ");
         return;
       }
       details.tradeHolderName = welfareForm.tradeHolderName;
       details.tradeHolderDiscord = welfareForm.tradeHolderDiscord;
+      details.tradeHolderPhone = welfareForm.tradeHolderPhone;
+      details.tradeHolderWelfare = welfareForm.tradeHolderWelfare;
       details.tradeToName = welfareForm.tradeToName;
       details.tradeToDiscord = welfareForm.tradeToDiscord;
+      details.tradeToPhone = welfareForm.tradeToPhone;
       welfareItem = "เทรดสวัสดิการ";
-    } else if (welfareSubTab === "leave") {
-      requestType = "leave";
-      if (!welfareForm.leaveName || !welfareForm.leaveDiscord) {
-        alert("❌ กรุณากรอกชื่อและเลขดิสคอร์ดคนออก - ออกลอย");
-        return;
-      }
-      details.leaveName = welfareForm.leaveName;
-      details.leaveDiscord = welfareForm.leaveDiscord;
-      details.weaponType = welfareForm.leaveWeaponType;
-      welfareItem = `ออก - ออกลอย [${welfareForm.leaveWeaponType}]`;
     }
 
     setLoading(true);
@@ -419,18 +451,72 @@ export default function GangDashboard() {
         ...prev,
         requesterName: "",
         requesterDiscord: "",
+        requesterPhone: "",
         requesterRole: "Leader",
         receiverName: "",
         receiverDiscord: "",
+        welfareItemId: "",
+        welfareItemName: "",
+        category: "",
         licensePlate: "",
         tradeHolderName: "",
         tradeHolderDiscord: "",
+        tradeHolderPhone: "",
+        tradeHolderWelfare: "",
         tradeToName: "",
         tradeToDiscord: "",
-        leaveName: "",
-        leaveDiscord: "",
+        tradeToPhone: "",
         approver: "",
       }));
+      loadWelfareRequests(gangData.abbreviation);
+    }
+  };
+
+  // ฟังก์ชันส่งคำขอออก - ออกลอย (เมนูหลัก)
+  const handleLeaveSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!gangData) return;
+
+    if (!leaveForm.requesterName || !leaveForm.requesterDiscord || !leaveForm.requesterPhone) {
+      alert("❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรผู้ยื่นเรื่อง");
+      return;
+    }
+    if (!leaveForm.leaveName || !leaveForm.leaveDiscord || !leaveForm.leavePhone) {
+      alert("❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรคนออก - ออกลอย");
+      return;
+    }
+    if (!leaveForm.approver) {
+      alert("❌ กรุณาเลือกชื่อสภาที่อนุมัติ");
+      return;
+    }
+
+    const details: any = { requesterRole: leaveForm.requesterRole, requesterPhone: leaveForm.requesterPhone, leaveName: leaveForm.leaveName, leaveDiscord: leaveForm.leaveDiscord, leavePhone: leaveForm.leavePhone };
+
+    setLoading(true);
+    const result = await createWelfareRequest({
+      gangName: gangData.fullName,
+      gangAbbreviation: gangData.abbreviation,
+      requestName: leaveForm.requesterName,
+      discordId: leaveForm.requesterDiscord,
+      welfareItem: "ออก - ออกลอย",
+      requestType: "leave",
+      approver: leaveForm.approver,
+      details: JSON.stringify(details),
+    });
+    setLoading(false);
+
+    alert(result.message);
+    if (result.success) {
+      setLeaveForm({
+        requesterName: "",
+        requesterDiscord: "",
+        requesterPhone: "",
+        requesterRole: "Leader",
+        leaveName: "",
+        leaveDiscord: "",
+        leavePhone: "",
+        approver: "",
+      });
       loadWelfareRequests(gangData.abbreviation);
     }
   };
@@ -515,12 +601,90 @@ export default function GangDashboard() {
     return item;
   };
 
+  const WelfareRequestsTable = ({ requests, title, emptyText }: { requests: any[]; title: string; emptyText: string }) => (
+    <div className="flex flex-col gap-4 w-full">
+      <h2 className="text-lg font-bold text-pink-400">{title}</h2>
+      <div className="overflow-x-auto w-full border border-white/10 rounded-xl bg-zinc-950/40">
+        <table className="w-full text-sm text-left text-zinc-200">
+          <thead className="text-xs bg-white/5 text-zinc-400 border-b border-white/10 uppercase">
+            <tr>
+              <th className="px-4 py-3">ผู้ยื่นเรื่อง / Discord</th>
+              <th className="px-4 py-3">รายการ</th>
+              <th className="px-4 py-3">รายละเอียด</th>
+              <th className="px-4 py-3">วันที่ยื่น</th>
+              <th className="px-4 py-3 text-center">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {requests.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center py-8 text-zinc-500">
+                  {emptyText}
+                </td>
+              </tr>
+            ) : (
+              requests.map((req) => {
+                const details = parseDetails(req.details);
+                let extra = "-";
+                if (req.requestType === "receive") {
+                  if (details.category === "weapon") {
+                    extra = details.weaponType ? `อาวุธ: ${details.weaponType}` : "อาวุธ";
+                  } else if (details.category === "car") {
+                    extra = `รถ: ${details.carType || "-"} (${details.licensePlate || "-"}) ${details.carQuantity || "4"} คัน`;
+                  } else {
+                    extra = details.welfareItemName || req.welfareItem || "-";
+                  }
+                } else if (req.requestType === "trade") {
+                  extra = `ถือ: ${details.tradeHolderName || "-"} (${details.tradeHolderPhone || "-"}) [${details.tradeHolderWelfare || "-"}] → รับ: ${details.tradeToName || "-"} (${details.tradeToPhone || "-"})`;
+                } else if (req.requestType === "leave") {
+                  extra = `${details.leaveName || "-"} (${details.leaveDiscord || "-"}) ${details.leavePhone || ""}`;
+                }
+                return (
+                  <tr key={req.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3">
+                      <span className="font-semibold text-white block">{req.requestName}</span>
+                      <span className="text-[11px] text-zinc-400 font-mono">ID: {req.discordId}</span>
+                      {details.requesterRole && <span className="text-[11px] text-purple-300 block">({details.requesterRole})</span>}
+                      {details.requesterPhone && <span className="text-[11px] text-zinc-400 block">📞 {details.requesterPhone}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-200 font-medium">
+                      {translateWelfareItem(req.welfareItem)}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-300 text-xs max-w-[240px] truncate" title={extra}>
+                      {extra}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-400 text-xs font-mono">
+                      {req.createdAt}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-md border ${req.status === "รับไปแล้ว"
+                        ? "bg-green-500/20 text-green-300 border-green-500/30"
+                        : req.status === "เอาออกแล้ว"
+                          ? "bg-red-500/20 text-red-300 border-red-500/30"
+                          : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                        }`}>
+                        {req.status === "รับไปแล้ว" && "✅ รับไปแล้ว"}
+                        {req.status === "เอาออกแล้ว" && "❌ เอาออกแล้ว"}
+                        {req.status === "รอรับ" && "⏳ รอรับ"}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   if (!gangData) return <div className="text-white text-center mt-20">กำลังโหลดข้อมูลแผงควบคุม...</div>;
 
   const navItems = [
     { id: "overview", label: "ภาพรวมแก๊ง", icon: "📊" },
     { id: "edit", label: "แก้ไขข้อมูล", icon: "⚙️" },
     { id: "welfare", label: "ยื่นสวัสดิการ", icon: "🎁" },
+    { id: "leave", label: "ออก - ออกลอย", icon: "🚪" },
     { id: "upload_uniform", label: "เพิ่มไฟล์ชุด", icon: "➕" },
     { id: "view_uniforms", label: "ดูไฟล์ทั้งหมด", icon: "📁" },
     { id: "pause", label: "พักแก๊ง", icon: "⏸️" },
@@ -535,7 +699,7 @@ export default function GangDashboard() {
 
   return (
     <div
-      className="relative flex min-h-screen bg-cover bg-center bg-no-repeat font-sans antialiased text-zinc-300 selection:bg-white/20"
+      className="relative flex min-h-screen bg-cover bg-center bg-no-repeat bg-fixed font-sans antialiased text-zinc-300 selection:bg-white/20"
       style={{ backgroundImage: "url('/COUNCIL.PNG')" }}
     >
       {/* Background Overlay มืดลึกแบบภาพยนตร์ */}
@@ -775,6 +939,26 @@ export default function GangDashboard() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 sm:col-span-2">
+                  <label className="text-sm font-medium text-zinc-200">URL โลโก้แก๊ง (Logo URL)</label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="url"
+                      name="logoUrl"
+                      defaultValue={pendingEdit ? pendingEdit.logoUrl : gangData.logoUrl || ""}
+                      placeholder="เช่น https://imgur.com/your-gang-logo.png"
+                      className="flex-1 h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-indigo-400 focus:outline-none text-sm"
+                    />
+                    <a
+                      href="https://imgbb.com/upload"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="h-11 px-4 rounded-xl bg-zinc-800 text-zinc-200 border border-white/10 hover:bg-zinc-700 text-sm font-medium flex items-center justify-center transition-all"
+                    >
+                      อัปโหลดรูปที่ imgbb
+                    </a>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 sm:col-span-2">
                   <label className="text-sm font-medium text-zinc-200">ชื่อสภาที่อนุมัติ</label>
                   <select
                     name="approver"
@@ -834,7 +1018,6 @@ export default function GangDashboard() {
                 {[
                   { id: "receive", label: "รับสวัสดิการ" },
                   { id: "trade", label: "เทรดสวัสดิการ" },
-                  { id: "leave", label: "ออก - ออกลอย" },
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -855,7 +1038,6 @@ export default function GangDashboard() {
                 <h2 className="text-lg font-bold text-purple-400">
                   {welfareSubTab === "receive" && "🎁 ฟอร์มขอรับสวัสดิการ"}
                   {welfareSubTab === "trade" && "🔄 ฟอร์มเทรดสวัสดิการ"}
-                  {welfareSubTab === "leave" && "🚪 ฟอร์มออก - ออกลอย [มีสวัสดิการ]"}
                 </h2>
 
                 <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
@@ -905,6 +1087,17 @@ export default function GangDashboard() {
                       required
                     />
                   </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-zinc-200">เบอร์โทรผู้ยื่นเรื่อง</label>
+                    <input
+                      type="tel"
+                      value={welfareForm.requesterPhone}
+                      onChange={(e) => setWelfareForm({ ...welfareForm, requesterPhone: e.target.value })}
+                      placeholder="เบอร์โทร"
+                      className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
+                      required
+                    />
+                  </div>
                 </div>
 
                 {welfareSubTab === "receive" && (
@@ -937,33 +1130,26 @@ export default function GangDashboard() {
                     <div className="flex flex-col gap-2">
                       <label className="text-sm font-medium text-zinc-200">ประเภทสวัสดิการ</label>
                       <select
-                        value={welfareForm.category}
-                        onChange={(e) => setWelfareForm({ ...welfareForm, category: e.target.value as any })}
+                        value={welfareForm.welfareItemId}
+                        onChange={(e) => {
+                          const selected = welfareItems.find((i) => String(i.id) === e.target.value);
+                          setWelfareForm({
+                            ...welfareForm,
+                            welfareItemId: e.target.value,
+                            welfareItemName: selected?.name || "",
+                            category: selected?.type || "",
+                          });
+                        }}
                         className="w-full h-11 px-4 rounded-xl bg-zinc-900 border border-white/10 text-sm text-white focus:border-purple-400 focus:outline-none"
                       >
-                        <option value="weapon">สวัสดิการอาวุธ</option>
-                        <option value="car">สวัสดิการรถ</option>
+                        <option value="">-- เลือกสวัสดิการ --</option>
+                        {welfareItems.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
-                    {welfareForm.category === "weapon" && (
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-zinc-200">ประเภทอาวุธ</label>
-                        <div className="flex gap-4">
-                          {["up_weapon", "down_weapon"].map((w) => (
-                            <label key={w} className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
-                              <input
-                                type="radio"
-                                value={w}
-                                checked={welfareForm.weaponType === w}
-                                onChange={(e) => setWelfareForm({ ...welfareForm, weaponType: e.target.value as any })}
-                                className="accent-purple-500"
-                              />
-                              {w === "up_weapon" ? "up_weapon" : "down_weapon"}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                     {welfareForm.category === "car" && (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="flex flex-col gap-2 sm:col-span-1">
@@ -996,21 +1182,21 @@ export default function GangDashboard() {
 
                 {welfareSubTab === "trade" && (
                   <div className="flex flex-col gap-4 border border-white/10 p-4 rounded-xl bg-white/[0.02]">
-                    <h3 className="text-sm font-bold text-zinc-200">ข้อมูลการเทรดสวัสดิการ</h3>
+                    <h3 className="text-sm font-bold text-zinc-200">ข้อมูลผู้ถือสวัสดิการในปัจจุบัน</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-zinc-200">ชื่อคนถือสวัสดิการ</label>
+                        <label className="text-sm font-medium text-zinc-200">ชื่อผู้ถือสวัสดิการ</label>
                         <input
                           type="text"
                           value={welfareForm.tradeHolderName}
                           onChange={(e) => setWelfareForm({ ...welfareForm, tradeHolderName: e.target.value })}
-                          placeholder="ชื่อคนถือสวัสดิการ"
+                          placeholder="ชื่อผู้ถือสวัสดิการ"
                           className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
                           required
                         />
                       </div>
                       <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-zinc-200">เลขดิสคอร์ดคนถือสวัสดิการ</label>
+                        <label className="text-sm font-medium text-zinc-200">เลขดิสคอร์ดผู้ถือสวัสดิการ</label>
                         <input
                           type="text"
                           value={welfareForm.tradeHolderDiscord}
@@ -1020,6 +1206,31 @@ export default function GangDashboard() {
                           required
                         />
                       </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-zinc-200">เบอร์โทรผู้ถือสวัสดิการ</label>
+                        <input
+                          type="tel"
+                          value={welfareForm.tradeHolderPhone}
+                          onChange={(e) => setWelfareForm({ ...welfareForm, tradeHolderPhone: e.target.value })}
+                          placeholder="เบอร์โทร"
+                          className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
+                          required
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-zinc-200">สวัสดิการที่มีอยู่</label>
+                        <input
+                          type="text"
+                          value={welfareForm.tradeHolderWelfare}
+                          onChange={(e) => setWelfareForm({ ...welfareForm, tradeHolderWelfare: e.target.value })}
+                          placeholder="เช่น Rebla 4 คัน"
+                          className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <h3 className="text-sm font-bold text-zinc-200 mt-2">ข้อมูลผู้รับสวัสดิการต่อ</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex flex-col gap-2">
                         <label className="text-sm font-medium text-zinc-200">ชื่อคนรับเทรด</label>
                         <input
@@ -1042,52 +1253,16 @@ export default function GangDashboard() {
                           required
                         />
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {welfareSubTab === "leave" && (
-                  <div className="flex flex-col gap-4 border border-white/10 p-4 rounded-xl bg-white/[0.02]">
-                    <h3 className="text-sm font-bold text-zinc-200">ข้อมูลคนออก - ออกลอย [มีสวัสดิการ]</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-zinc-200">ชื่อคนออก</label>
+                        <label className="text-sm font-medium text-zinc-200">เบอร์โทรคนรับเทรด</label>
                         <input
-                          type="text"
-                          value={welfareForm.leaveName}
-                          onChange={(e) => setWelfareForm({ ...welfareForm, leaveName: e.target.value })}
-                          placeholder="ชื่อคนออก"
+                          type="tel"
+                          value={welfareForm.tradeToPhone}
+                          onChange={(e) => setWelfareForm({ ...welfareForm, tradeToPhone: e.target.value })}
+                          placeholder="เบอร์โทร"
                           className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
                           required
                         />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-zinc-200">เลขดิสคอร์ดคนออก</label>
-                        <input
-                          type="text"
-                          value={welfareForm.leaveDiscord}
-                          onChange={(e) => setWelfareForm({ ...welfareForm, leaveDiscord: e.target.value })}
-                          placeholder="เลขดิสคอร์ด"
-                          className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium text-zinc-200">ประเภทอาวุธสวัสดิการ</label>
-                      <div className="flex gap-4">
-                        {["up_weapon", "down_weapon"].map((w) => (
-                          <label key={w} className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
-                            <input
-                              type="radio"
-                              value={w}
-                              checked={welfareForm.leaveWeaponType === w}
-                              onChange={(e) => setWelfareForm({ ...welfareForm, leaveWeaponType: e.target.value as any })}
-                              className="accent-purple-500"
-                            />
-                            {w === "up_weapon" ? "up_weapon" : "down_weapon"}
-                          </label>
-                        ))}
                       </div>
                     </div>
                   </div>
@@ -1114,75 +1289,144 @@ export default function GangDashboard() {
               </form>
 
               {/* ตารางประวัติสวัสดิการ */}
-              <div className="flex flex-col gap-4 w-full">
-                <h2 className="text-lg font-bold text-pink-400">📋 ตารางตรวจสอบสถานะสวัสดิการภายในแก๊ง</h2>
-                <div className="overflow-x-auto w-full border border-white/10 rounded-xl bg-zinc-950/40">
-                  <table className="w-full text-sm text-left text-zinc-200">
-                    <thead className="text-xs bg-white/5 text-zinc-400 border-b border-white/10 uppercase">
-                      <tr>
-                        <th className="px-4 py-3">ผู้ยื่นเรื่อง / Discord</th>
-                        <th className="px-4 py-3">รายการ</th>
-                        <th className="px-4 py-3">รายละเอียด</th>
-                        <th className="px-4 py-3">วันที่ยื่น</th>
-                        <th className="px-4 py-3 text-center">สถานะ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {welfareRequests.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="text-center py-8 text-zinc-500">
-                            ❌ ยังไม่มีประวัติการยื่นขอรับสวัสดิการของแก๊งนี้ในระบบ
-                          </td>
-                        </tr>
-                      ) : (
-                        welfareRequests.map((req) => {
-                          const details = parseDetails(req.details);
-                          let extra = "-";
-                          if (req.requestType === "receive" || details.category) {
-                            extra = details.category === "weapon"
-                              ? `อาวุธ: ${details.weaponType || "-"}`
-                              : `รถ: ${details.carType || "-"} (${details.licensePlate || "-"}) ${details.carQuantity || "4"} คัน`;
-                          } else if (req.requestType === "trade") {
-                            extra = `ถือ: ${details.tradeHolderName || "-"} → รับ: ${details.tradeToName || "-"}`;
-                          } else if (req.requestType === "leave") {
-                            extra = `${details.leaveName || "-"} [${details.weaponType || "-"}]`;
-                          }
-                          return (
-                            <tr key={req.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                              <td className="px-4 py-3">
-                                <span className="font-semibold text-white block">{req.requestName}</span>
-                                <span className="text-[11px] text-zinc-400 font-mono">ID: {req.discordId}</span>
-                                {details.requesterRole && <span className="text-[11px] text-purple-300 block">({details.requesterRole})</span>}
-                              </td>
-                              <td className="px-4 py-3 text-zinc-200 font-medium">
-                                {translateWelfareItem(req.welfareItem)}
-                              </td>
-                              <td className="px-4 py-3 text-zinc-300 text-xs max-w-[240px] truncate" title={extra}>
-                                {extra}
-                              </td>
-                              <td className="px-4 py-3 text-zinc-400 text-xs font-mono">
-                                {req.createdAt}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <span className={`text-xs font-bold px-2.5 py-1 rounded-md border ${req.status === "รับไปแล้ว"
-                                  ? "bg-green-500/20 text-green-300 border-green-500/30"
-                                  : req.status === "เอาออกแล้ว"
-                                    ? "bg-red-500/20 text-red-300 border-red-500/30"
-                                    : "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                                  }`}>
-                                  {req.status === "รับไปแล้ว" && "✅ รับไปแล้ว"}
-                                  {req.status === "เอาออกแล้ว" && "❌ เอาออกแล้ว"}
-                                  {req.status === "รอรับ" && "⏳ รอรับ"}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
+              <WelfareRequestsTable
+                requests={welfareRequests.filter((r) => r.requestType !== "leave")}
+                title="📋 ตารางตรวจสอบสถานะสวัสดิการภายในแก๊ง"
+                emptyText="❌ ยังไม่มีประวัติการยื่นขอรับสวัสดิการของแก๊งนี้ในระบบ"
+              />
+            </div>
+          )}
+
+          {/* แท็บ: ออก - ออกลอย */}
+          {activeTab === "leave" && (
+            <div className="flex flex-col gap-8 w-full">
+              <form onSubmit={handleLeaveSubmit} className="flex flex-col gap-5 w-full text-white border-b border-white/10 pb-8">
+                <h2 className="text-lg font-bold text-purple-400">🚪 ฟอร์มออก - ออกลอย [มีสวัสดิการ]</h2>
+
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                  ⏳ คำขอจะถูกบันทึกเป็น "รอรับ" และต้องรอให้สภากลางกดยืนยันก่อนจึงจะสำเร็จ
                 </div>
-              </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-zinc-200">คนยื่นเรื่อง (มีแค่ Leader หรือ Deputy เท่านั้น)</label>
+                  <div className="flex gap-4">
+                    {["Leader", "Deputy"].map((role) => (
+                      <label key={role} className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="leaveRequesterRole"
+                          value={role}
+                          checked={leaveForm.requesterRole === role}
+                          onChange={(e) => setLeaveForm({ ...leaveForm, requesterRole: e.target.value as any })}
+                          className="accent-purple-500"
+                          required
+                        />
+                        {role}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-zinc-200">ชื่อผู้ยื่นเรื่อง</label>
+                    <input
+                      type="text"
+                      value={leaveForm.requesterName}
+                      onChange={(e) => setLeaveForm({ ...leaveForm, requesterName: e.target.value })}
+                      placeholder="ชื่อผู้ยื่นเรื่อง"
+                      className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-zinc-200">เลขดิสคอร์ดผู้ยื่นเรื่อง</label>
+                    <input
+                      type="text"
+                      value={leaveForm.requesterDiscord}
+                      onChange={(e) => setLeaveForm({ ...leaveForm, requesterDiscord: e.target.value })}
+                      placeholder="เช่น 4583920194857201"
+                      className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-zinc-200">เบอร์โทรผู้ยื่นเรื่อง</label>
+                    <input
+                      type="tel"
+                      value={leaveForm.requesterPhone}
+                      onChange={(e) => setLeaveForm({ ...leaveForm, requesterPhone: e.target.value })}
+                      placeholder="เบอร์โทร"
+                      className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-4 border border-white/10 p-4 rounded-xl bg-white/[0.02]">
+                  <h3 className="text-sm font-bold text-zinc-200">ข้อมูลคนออก - ออกลอย [มีสวัสดิการ]</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium text-zinc-200">ชื่อคนออก</label>
+                      <input
+                        type="text"
+                        value={leaveForm.leaveName}
+                        onChange={(e) => setLeaveForm({ ...leaveForm, leaveName: e.target.value })}
+                        placeholder="ชื่อคนออก"
+                        className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium text-zinc-200">เลขดิสคอร์ดคนออก</label>
+                      <input
+                        type="text"
+                        value={leaveForm.leaveDiscord}
+                        onChange={(e) => setLeaveForm({ ...leaveForm, leaveDiscord: e.target.value })}
+                        placeholder="เลขดิสคอร์ด"
+                        className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-sm font-medium text-zinc-200">เบอร์โทรคนออก</label>
+                      <input
+                        type="tel"
+                        value={leaveForm.leavePhone}
+                        onChange={(e) => setLeaveForm({ ...leaveForm, leavePhone: e.target.value })}
+                        placeholder="เบอร์โทร"
+                        className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-zinc-200">ชื่อสภาที่อนุมัติ</label>
+                  <select
+                    value={leaveForm.approver}
+                    onChange={(e) => setLeaveForm({ ...leaveForm, approver: e.target.value })}
+                    className="w-full h-11 px-4 rounded-xl bg-zinc-900 border border-white/10 text-sm text-white focus:border-purple-400 focus:outline-none"
+                    required
+                  >
+                    <option value="">-- เลือกสภา --</option>
+                    {councilNames.map((name) => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button type="submit" disabled={loading} className="w-full h-12 mt-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 font-semibold hover:opacity-90 transition-all disabled:opacity-50">
+                  {loading ? "กำลังส่งคำขอ..." : "ส่งคำขอ"}
+                </button>
+              </form>
+
+              <WelfareRequestsTable
+                requests={welfareRequests.filter((r) => r.requestType === "leave")}
+                title="📋 ประวัติการออก - ออกลอย"
+                emptyText="❌ ยังไม่มีประวัติการออก - ออกลอยของแก๊งนี้"
+              />
             </div>
           )}
 
@@ -1193,6 +1437,17 @@ export default function GangDashboard() {
 
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
                 ⏳ ไฟล์ชุดจะถูกบันทึกเป็น "รอลง" และต้องรอให้สภากลางตรวจสอบและนำเข้าก่อนจึงจะสำเร็จ
+              </div>
+
+              <div className="flex flex-col gap-2 p-4 rounded-xl border border-white/10 bg-white/[0.02]">
+                <label className="text-sm font-medium text-zinc-200">ตัวอย่างชุด</label>
+                <Image
+                  src="/ex.jpg"
+                  alt="ตัวอย่างชุด"
+                  width={1200}
+                  height={675}
+                  className="w-full h-auto rounded-xl border border-white/10 object-cover"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

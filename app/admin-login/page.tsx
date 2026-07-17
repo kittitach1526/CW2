@@ -48,7 +48,7 @@ export default function AdminLoginPage() {
 
   return (
     <div 
-      className="relative flex flex-col items-center justify-center min-h-screen bg-cover bg-center bg-no-repeat font-sans antialiased py-10"
+      className="relative flex flex-col items-center justify-center min-h-screen bg-cover bg-center bg-no-repeat bg-fixed font-sans antialiased py-10"
       style={{ backgroundImage: "url('COUNCIL.PNG')" }}
     >
       {/* Background Overlay คุมแสงกระจกแบบเงียบขรึมล้อตามหน้าแรก */}

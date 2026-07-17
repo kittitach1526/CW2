@@ -4,7 +4,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <div 
-      className="relative flex flex-col items-center justify-center min-h-screen bg-cover bg-center bg-no-repeat font-sans antialiased"
+      className="relative flex flex-col items-center justify-center min-h-screen bg-cover bg-center bg-no-repeat bg-fixed font-sans antialiased"
       style={{ backgroundImage: "url('COUNCIL.PNG')" }}
     >
       {/* Dark / Light Overlay ชั้นกรองแสงเพื่อให้พื้นหลังไม่แย่งซีนข้อความ */}

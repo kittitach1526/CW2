@@ -19,12 +19,18 @@ import {
   approvePauseRequest,
   rejectPauseRequest,
   reportPauseRequest,
+  getWelfareItems,
+  createWelfareItem,
+  updateWelfareItem,
+  deleteWelfareItem,
 } from "../register";
+import Modal from "../components/Modal";
+import WelfareSeasonManager from "../components/WelfareSeasonManager";
 
 export default function CouncilAdminDashboard() {
   const router = useRouter();
   const [adminData, setAdminData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"approve_gang" | "approve_welfare" | "approve_uniform" | "approve_gang_edit" | "approve_disband" | "approve_pause" | "gang_list" | "welfare_by_gang">("approve_gang");
+  const [activeTab, setActiveTab] = useState<"approve_gang" | "approve_welfare" | "approve_uniform" | "approve_gang_edit" | "approve_disband" | "approve_pause" | "gang_list" | "welfare_by_gang" | "welfare_items" | "welfare_manage">("approve_gang");
   const [loading, setLoading] = useState(false);
   const [selectedGangAbbr, setSelectedGangAbbr] = useState("");
   
@@ -35,6 +41,12 @@ export default function CouncilAdminDashboard() {
   const [editRequests, setEditRequests] = useState<any[]>([]);
   const [disbandRequests, setDisbandRequests] = useState<any[]>([]);
   const [pauseRequests, setPauseRequests] = useState<any[]>([]);
+  const [welfareItems, setWelfareItems] = useState<any[]>([]);
+  const [welfareItemName, setWelfareItemName] = useState("");
+  const [welfareItemType, setWelfareItemType] = useState("");
+  const [editingWelfareItemId, setEditingWelfareItemId] = useState<number | null>(null);
+  const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
+  const [newTypeInput, setNewTypeInput] = useState("");
 
   // 1. ตรวจสอบสิทธิ์ผู้ดูแลระบบสภากลาง
   useEffect(() => {
@@ -107,6 +119,24 @@ export default function CouncilAdminDashboard() {
             setPauseRequests([]);
           }
         }
+
+        if (activeTab === "welfare_items") {
+          const result = await getWelfareItems();
+          if (result.success) {
+            setWelfareItems(result.items || []);
+          } else {
+            setWelfareItems([]);
+          }
+        }
+
+        if (activeTab === "welfare_manage") {
+          const result = await getAllGangs();
+          if (result.success) {
+            setGangsList(result.gangs || []);
+          } else {
+            setGangsList([]);
+          }
+        }
       } catch (error) {
         console.error("🚨 ระบบหลังบ้านขัดข้อง:", error);
       } finally {
@@ -172,6 +202,63 @@ export default function CouncilAdminDashboard() {
       }
     } catch (error) {
       alert("❌ เกิดข้อผิดพลาดในการอัปเดตข้อมูลชุด");
+    }
+  };
+
+  const resetWelfareItemForm = () => {
+    setWelfareItemName("");
+    setWelfareItemType("");
+    setEditingWelfareItemId(null);
+  };
+
+  const handleSaveWelfareItem = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!welfareItemName.trim() || !welfareItemType.trim()) {
+      alert("❌ กรุณากรอกชื่อและประเภทสวัสดิการ");
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = editingWelfareItemId
+        ? await updateWelfareItem(editingWelfareItemId, { name: welfareItemName, type: welfareItemType })
+        : await createWelfareItem(welfareItemName, welfareItemType);
+      setLoading(false);
+      if (result.success) {
+        alert(result.message);
+        resetWelfareItemForm();
+        const refresh = await getWelfareItems();
+        if (refresh.success) setWelfareItems(refresh.items || []);
+      } else {
+        alert(result.message);
+      }
+    } catch (error) {
+      setLoading(false);
+      alert("❌ เกิดข้อผิดพลาดในการบันทึกรายการสวัสดิการ");
+    }
+  };
+
+  const handleEditWelfareItem = (item: any) => {
+    setWelfareItemName(item.name || "");
+    setWelfareItemType(item.type || "");
+    setEditingWelfareItemId(item.id);
+  };
+
+  const handleDeleteWelfareItem = async (id: number) => {
+    if (!confirm("ยืนยันการลบรายการสวัสดิการนี้หรือไม่?")) return;
+    setLoading(true);
+    try {
+      const result = await deleteWelfareItem(id);
+      setLoading(false);
+      if (result.success) {
+        alert(result.message);
+        const refresh = await getWelfareItems();
+        if (refresh.success) setWelfareItems(refresh.items || []);
+      } else {
+        alert(result.message);
+      }
+    } catch (error) {
+      setLoading(false);
+      alert("❌ เกิดข้อผิดพลาดในการลบรายการสวัสดิการ");
     }
   };
 
@@ -250,15 +337,16 @@ const formatWelfareDetails = (req: any) => {
   const details = parseDetails(req.details);
   const type = req.requestType;
   if (type === "receive") {
-    if (details.category === "weapon") return `อาวุธ: ${details.weaponType || "-"}`;
-    if (details.category === "car") return `รถ: ${details.carType || "-"} (${details.licensePlate || "-"}) ${details.carQuantity || "4"} คัน`;
-    return "-";
+    const itemName = details.welfareItemName || req.welfareItem || "-";
+    if (details.category === "weapon") return details.weaponType ? `${itemName} (${details.weaponType})` : itemName;
+    if (details.category === "car") return `${itemName}: ${details.carType || "-"} (${details.licensePlate || "-"}) ${details.carQuantity || "4"} คัน`;
+    return itemName;
   }
   if (type === "trade") {
-    return `ถือ: ${details.tradeHolderName || "-"} (${details.tradeHolderDiscord || "-"}) → รับ: ${details.tradeToName || "-"} (${details.tradeToDiscord || "-"})`;
+    return `ถือ: ${details.tradeHolderName || "-"} (${details.tradeHolderDiscord || "-"}) (${details.tradeHolderPhone || "-"}) [${details.tradeHolderWelfare || "-"}] → รับ: ${details.tradeToName || "-"} (${details.tradeToDiscord || "-"}) (${details.tradeToPhone || "-"})`;
   }
   if (type === "leave") {
-    return `${details.leaveName || "-"} (${details.leaveDiscord || "-"}) [${details.weaponType || "-"}]`;
+    return `ผู้ยื่น: ${details.requesterName || req.requestName || "-"} (${details.requesterPhone || "-"}) → ออก: ${details.leaveName || "-"} (${details.leaveDiscord || "-"})${details.leavePhone ? ` ${details.leavePhone}` : ""}${details.weaponType ? ` [${details.weaponType}]` : ""}`;
   }
   return "-";
 };
@@ -285,6 +373,8 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
     { id: "approve_uniform", label: "จัดการไฟล์ชุด", icon: "👕" },
     { id: "gang_list", label: "รายชื่อแก๊งทั้งหมด", icon: "📋" },
     { id: "welfare_by_gang", label: "สวัสดิการตามแก๊ง", icon: "🎁" },
+    { id: "welfare_items", label: "จัดการรายการสวัสดิการ", icon: "📦" },
+    { id: "welfare_manage", label: "จัดการสวัสดิการ", icon: "⚙️" },
   ] as const;
 
   const pendingGangCount = gangsList.filter((g) => g.status === "pending" || g.status === "รอยุบ").length;
@@ -298,7 +388,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
 
   return (
     <div
-      className="relative flex min-h-screen bg-cover bg-center bg-no-repeat font-sans antialiased text-zinc-300 selection:bg-white/20"
+      className="relative flex min-h-screen bg-cover bg-center bg-no-repeat bg-fixed font-sans antialiased text-zinc-300 selection:bg-white/20"
       style={{ backgroundImage: "url('/COUNCIL.PNG')" }}
     >
       {/* Background Overlay มืดลึกแบบภาพยนตร์ */}
@@ -471,13 +561,14 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                           <th className="px-6 py-4">ชื่อใหม่ [ย่อใหม่]</th>
                           <th className="px-6 py-4">หัวหน้าใหม่</th>
                           <th className="px-6 py-4">ประเภท</th>
+                          <th className="px-6 py-4">โลโก้ใหม่</th>
                           <th className="px-6 py-4">เหตุผล</th>
                           <th className="px-6 py-4 text-center">จัดการคำขอ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/[0.04] text-zinc-300">
                         {editRequests.length === 0 ? (
-                          <tr><td colSpan={6} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีคำขอแก้ไขแก๊งค้างในระบบ</td></tr>
+                          <tr><td colSpan={7} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีคำขอแก้ไขแก๊งค้างในระบบ</td></tr>
                         ) : (
                           editRequests.map((req) => (
                             <tr key={req.id} className="hover:bg-white/[0.01] transition-colors">
@@ -494,6 +585,14 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                                 }`}>
                                   {req.type || 'Gang'}
                                 </span>
+                              </td>
+                              <td className="px-6 py-4 text-zinc-400">
+                                {req.logoUrl ? (
+                                  <div className="flex flex-col gap-1">
+                                    <a href={req.logoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-[11px]">ดูโลโก้</a>
+                                    <a href="https://imgbb.com/upload" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-200 text-[11px]">imgbb</a>
+                                  </div>
+                                ) : "-"}
                               </td>
                               <td className="px-6 py-4 text-zinc-400 max-w-[200px] truncate">{req.editReason || "-"}</td>
                               <td className="px-6 py-4 text-center flex justify-center gap-2">
@@ -634,6 +733,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                                 <span className="block text-zinc-300 font-medium">{req.requestName}</span>
                                 <span className="text-[10px] text-zinc-500 font-mono">{req.discordId}</span>
                                 {(() => { const d = parseDetails(req.details); return d.requesterRole ? <span className="text-[10px] text-purple-300 block">({d.requesterRole})</span> : null; })()}
+                                {(() => { const d = parseDetails(req.details); return d.requesterPhone ? <span className="text-[10px] text-zinc-400 block">📞 {d.requesterPhone}</span> : null; })()}
                               </td>
                               <td className="px-6 py-4 text-zinc-400">{welfareTypeLabel(req)}</td>
                               <td className="px-6 py-4 text-zinc-400">{translateWelfareItem(req.welfareItem)}</td>
@@ -732,55 +832,59 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                   <div className="p-5 border-b border-white/[0.06] bg-white/[0.01]">
                     <h2 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">📋 รายชื่อแก๊งทั้งหมด</h2>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left whitespace-nowrap">
-                      <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06]">
-                        <tr>
-                          <th className="px-6 py-4">รหัส</th>
-                          <th className="px-6 py-4">ชื่อแก๊ง [ย่อ]</th>
-                          <th className="px-6 py-4">หัวหน้า / รอง</th>
-                          <th className="px-6 py-4">สีแก๊ง</th>
-                          <th className="px-6 py-4">ประเภท</th>
-                          <th className="px-6 py-4">สถานะ</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/[0.04] text-zinc-300">
-                        {gangsList.length === 0 ? (
-                          <tr><td colSpan={6} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีข้อมูลรายชื่อแก๊งในสารบบ</td></tr>
-                        ) : (
-                          gangsList.map((gang) => (
-                            <tr key={gang.id} className="hover:bg-white/[0.01] transition-colors">
-                              <td className="px-6 py-4 font-mono text-zinc-600">#{gang.id}</td>
-                              <td className="px-6 py-4 font-bold text-white">{gang.fullName} <span className="text-zinc-500 font-mono font-normal">[{gang.abbreviation}]</span></td>
-                              <td className="px-6 py-4 text-zinc-400">
-                                {gang.leader}
-                                {gang.coLeader1 && `, ${gang.coLeader1}`}
-                                {gang.coLeader2 && `, ${gang.coLeader2}`}
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="w-6 h-6 rounded-md border border-white/[0.1]" style={{ backgroundColor: gang.colorTheme || "#3b82f6" }} />
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${
-                                  gang.type === 'Gangs-LD'
-                                    ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-                                    : gang.type === 'Family'
-                                    ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
-                                    : 'bg-blue-500/10 text-blue-300 border-blue-500/20'
-                                }`}>
-                                  {gang.type || 'Gang'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${gang.status === 'approved' ? 'bg-white/[0.08] text-white border-white/[0.1]' : 'bg-white/[0.01] text-zinc-500 border-white/[0.04]'}`}>
-                                  {gang.status === 'approved' ? '✓ ได้รับสิทธิ์สภา' : '⏳ รอตรวจประวัติ'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                  <div className="flex flex-col gap-6 p-4">
+                    {[
+                      { key: "Gang", label: "Gang" },
+                      { key: "Gangs-LD", label: "Gang-LD" },
+                      { key: "Family", label: "Family" },
+                    ].map(({ key, label }) => {
+                      const list = gangsList.filter(
+                        (g) => (g.type || "Gang") === key
+                      );
+                      return (
+                        <div key={key} className="flex flex-col gap-2">
+                          <h3 className="text-sm font-bold text-zinc-200">🏷️ {label}</h3>
+                          <div className="overflow-x-auto border border-white/[0.04] rounded-xl">
+                            <table className="w-full text-xs text-left whitespace-nowrap">
+                              <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06]">
+                                <tr>
+                                  <th className="px-6 py-4">รหัส</th>
+                                  <th className="px-6 py-4">ชื่อแก๊ง [ย่อ]</th>
+                                  <th className="px-6 py-4">หัวหน้า / รอง</th>
+                                  <th className="px-6 py-4">สีแก๊ง</th>
+                                  <th className="px-6 py-4">สถานะ</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-white/[0.04] text-zinc-300">
+                                {list.length === 0 ? (
+                                  <tr><td colSpan={5} className="text-center py-8 text-zinc-600 font-light tracking-wide">📭 ไม่มีข้อมูลในหมวด {label}</td></tr>
+                                ) : (
+                                  list.map((gang) => (
+                                    <tr key={gang.id} className="hover:bg-white/[0.01] transition-colors">
+                                      <td className="px-6 py-4 font-mono text-zinc-600">#{gang.id}</td>
+                                      <td className="px-6 py-4 font-bold text-white">{gang.fullName} <span className="text-zinc-500 font-mono font-normal">[{gang.abbreviation}]</span></td>
+                                      <td className="px-6 py-4 text-zinc-400">
+                                        {gang.leader}
+                                        {gang.coLeader1 && `, ${gang.coLeader1}`}
+                                        {gang.coLeader2 && `, ${gang.coLeader2}`}
+                                      </td>
+                                      <td className="px-6 py-4">
+                                        <div className="w-6 h-6 rounded-md border border-white/[0.1]" style={{ backgroundColor: gang.colorTheme || "#3b82f6" }} />
+                                      </td>
+                                      <td className="px-6 py-4">
+                                        <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${gang.status === 'approved' ? 'bg-white/[0.08] text-white border-white/[0.1]' : 'bg-white/[0.01] text-zinc-500 border-white/[0.04]'}`}>
+                                          {gang.status === 'approved' ? '✓ ได้รับสิทธิ์สภา' : '⏳ รอตรวจประวัติ'}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -827,6 +931,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                                 {req.requestName}
                                 <span className="block text-zinc-500 font-mono">{req.discordId}</span>
                                 {(() => { const d = parseDetails(req.details); return d.requesterRole ? <span className="text-[10px] text-purple-300 block">({d.requesterRole})</span> : null; })()}
+                                {(() => { const d = parseDetails(req.details); return d.requesterPhone ? <span className="text-[10px] text-zinc-400 block">📞 {d.requesterPhone}</span> : null; })()}
                               </td>
                               <td className="px-6 py-4 text-zinc-400">{welfareTypeLabel(req)}</td>
                               <td className="px-6 py-4 text-zinc-400">{translateWelfareItem(req.welfareItem)}</td>
@@ -842,6 +947,173 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                         )}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              )}
+
+              {/* MENU 6: จัดการรายการสวัสดิการ */}
+              {activeTab === "welfare_items" && (
+                <div className="flex flex-col w-full">
+                  <div className="p-5 border-b border-white/[0.06] bg-white/[0.01]">
+                    <h2 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">📦 จัดการรายการสวัสดิการ</h2>
+                  </div>
+                  <div className="p-5 flex flex-col gap-6">
+                    <form onSubmit={handleSaveWelfareItem} className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
+                      <div className="flex flex-col gap-2 sm:col-span-2">
+                        <label className="text-xs font-medium text-zinc-400">ชื่อสวัสดิการ</label>
+                        <input
+                          type="text"
+                          value={welfareItemName}
+                          onChange={(e) => setWelfareItemName(e.target.value)}
+                          placeholder="เช่น สวัสดิการอาวุธ"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-white/[0.06] text-zinc-200 text-xs focus:outline-none"
+                          required
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 sm:col-span-1">
+                        <label className="text-xs font-medium text-zinc-400">ประเภท</label>
+                        <input
+                          type="text"
+                          list="welfareTypeList"
+                          value={welfareItemType}
+                          onChange={(e) => setWelfareItemType(e.target.value)}
+                          placeholder="เช่น weapon / car / ใหม่"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-white/[0.06] text-zinc-200 text-xs focus:outline-none"
+                          required
+                        />
+                        <datalist id="welfareTypeList">
+                          {Array.from(new Set(welfareItems.map((i) => i.type))).map((type) => (
+                            <option key={type} value={type} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <div className="flex flex-wrap gap-2 sm:col-span-2 items-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNewTypeInput("");
+                            setIsTypeModalOpen(true);
+                          }}
+                          className="h-10 px-4 rounded-lg bg-zinc-800 text-zinc-300 border border-white/10 hover:bg-zinc-700 text-xs font-medium transition-all"
+                        >
+                          ➕ เพิ่มประเภท
+                        </button>
+                        <button
+                          type="submit"
+                          className="h-10 px-4 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 text-xs font-medium transition-all"
+                        >
+                          {editingWelfareItemId ? "💾 บันทึก" : "➕ เพิ่ม"}
+                        </button>
+                        {editingWelfareItemId && (
+                          <button
+                            type="button"
+                            onClick={resetWelfareItemForm}
+                            className="h-10 px-4 rounded-lg bg-zinc-800 text-zinc-300 border border-white/10 hover:bg-zinc-700 text-xs font-medium transition-all"
+                          >
+                            ยกเลิก
+                          </button>
+                        )}
+                      </div>
+                    </form>
+
+                    <Modal
+                      isOpen={isTypeModalOpen}
+                      onClose={() => setIsTypeModalOpen(false)}
+                      title="เพิ่มประเภทสวัสดิการใหม่"
+                    >
+                      <div className="flex flex-col gap-4">
+                        <input
+                          type="text"
+                          value={newTypeInput}
+                          onChange={(e) => setNewTypeInput(e.target.value)}
+                          placeholder="ชื่อประเภทใหม่ เช่น drone"
+                          className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-white/[0.06] text-zinc-200 text-xs focus:outline-none"
+                          autoFocus
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsTypeModalOpen(false)}
+                            className="h-9 px-4 rounded-lg bg-zinc-800 text-zinc-300 border border-white/10 hover:bg-zinc-700 text-xs font-medium transition-all"
+                          >
+                            ยกเลิก
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!newTypeInput.trim()) {
+                                alert("❌ กรุณากรอกชื่อประเภท");
+                                return;
+                              }
+                              setWelfareItemType(newTypeInput.trim());
+                              setNewTypeInput("");
+                              setIsTypeModalOpen(false);
+                            }}
+                            className="h-9 px-4 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 text-xs font-medium transition-all"
+                          >
+                            ยืนยัน
+                          </button>
+                        </div>
+                      </div>
+                    </Modal>
+
+                    <div className="overflow-x-auto border border-white/[0.04] rounded-xl">
+                      <table className="w-full text-xs text-left whitespace-nowrap">
+                        <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06]">
+                          <tr>
+                            <th className="px-6 py-4">ชื่อสวัสดิการ</th>
+                            <th className="px-6 py-4">ประเภท</th>
+                            <th className="px-6 py-4 text-center">จัดการ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/[0.04] text-zinc-300">
+                          {welfareItems.length === 0 ? (
+                            <tr><td colSpan={3} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีรายการสวัสดิการในระบบ</td></tr>
+                          ) : (
+                            welfareItems.map((item) => (
+                              <tr key={item.id} className="hover:bg-white/[0.01] transition-colors">
+                                <td className="px-6 py-4 font-medium text-white">{item.name}</td>
+                                <td className="px-6 py-4 text-zinc-400">
+                                  <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${
+                                    item.type === 'car' ? 'bg-amber-500/10 text-amber-300 border-amber-500/20' : item.type === 'weapon' ? 'bg-blue-500/10 text-blue-300 border-blue-500/20' : 'bg-zinc-500/10 text-zinc-300 border-zinc-500/20'
+                                  }`}>
+                                    {item.type === 'car' ? 'รถ' : item.type === 'weapon' ? 'อาวุธ' : item.type || 'อื่นๆ'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex justify-center gap-2">
+                                    <button
+                                      onClick={() => handleEditWelfareItem(item)}
+                                      className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 text-[11px] transition-all"
+                                    >
+                                      แก้ไข
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteWelfareItem(item.id)}
+                                      className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 text-[11px] transition-all"
+                                    >
+                                      ลบ
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* MENU 7: จัดการสวัสดิการ (ซีซัน/อีเว้น) */}
+              {activeTab === "welfare_manage" && (
+                <div className="flex flex-col w-full">
+                  <div className="p-5 border-b border-white/[0.06] bg-white/[0.01]">
+                    <h2 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">⚙️ จัดการสวัสดิการ</h2>
+                  </div>
+                  <div className="p-5">
+                    <WelfareSeasonManager gangsList={gangsList} />
                   </div>
                 </div>
               )}

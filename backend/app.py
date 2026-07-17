@@ -185,6 +185,7 @@ def create_gang_edit_request(gang_id):
             "coLeader2Discord": data.get("coLeader2Discord") or None,
             "coLeader2Phone": data.get("coLeader2Phone") or None,
             "type": data.get("type", existing["type"]),
+            "logoUrl": data.get("logoUrl") or None,
             "editReason": data.get("editReason") or None,
             "approver": data.get("approver") or None,
             "newPassword": data.get("newPassword") or None,
@@ -201,7 +202,7 @@ def create_gang_edit_request(gang_id):
                 UPDATE gang_edit_requests SET
                     fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?, leaderPhone = ?,
                     coLeader1 = ?, coLeader1Discord = ?, coLeader1Phone = ?, coLeader2 = ?, coLeader2Discord = ?, coLeader2Phone = ?,
-                    type = ?, editReason = ?, approver = ?, newPassword = ?, createdAt = ?
+                    type = ?, logoUrl = ?, editReason = ?, approver = ?, newPassword = ?, createdAt = ?
                 WHERE id = ?
                 """,
                 (
@@ -209,7 +210,7 @@ def create_gang_edit_request(gang_id):
                     payload["leader"], payload["leaderDiscord"], payload["leaderPhone"],
                     payload["coLeader1"], payload["coLeader1Discord"], payload["coLeader1Phone"],
                     payload["coLeader2"], payload["coLeader2Discord"], payload["coLeader2Phone"],
-                    payload["type"], payload["editReason"], payload["approver"], payload["newPassword"], now_thai(),
+                    payload["type"], payload["logoUrl"], payload["editReason"], payload["approver"], payload["newPassword"], now_thai(),
                     pending["id"],
                 ),
             )
@@ -228,15 +229,15 @@ def create_gang_edit_request(gang_id):
             INSERT INTO gang_edit_requests
             (gangId, fullName, abbreviation, colorTheme, leader, leaderDiscord, leaderPhone,
              coLeader1, coLeader1Discord, coLeader1Phone, coLeader2, coLeader2Discord, coLeader2Phone, type,
-             editReason, approver, newPassword, status, createdAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+             logoUrl, editReason, approver, newPassword, status, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
             """,
             (
                 gang_id, payload["fullName"], payload["abbreviation"], payload["colorTheme"],
                 payload["leader"], payload["leaderDiscord"], payload["leaderPhone"],
                 payload["coLeader1"], payload["coLeader1Discord"], payload["coLeader1Phone"],
                 payload["coLeader2"], payload["coLeader2Discord"], payload["coLeader2Phone"],
-                payload["type"], payload["editReason"], payload["approver"], payload["newPassword"], now_thai(),
+                payload["type"], payload["logoUrl"], payload["editReason"], payload["approver"], payload["newPassword"], now_thai(),
             ),
         )
         db.commit()
@@ -323,14 +324,14 @@ def approve_gang_edit_request(id):
                 UPDATE gangs SET
                     fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?, leaderPhone = ?,
                     coLeader1 = ?, coLeader1Discord = ?, coLeader1Phone = ?, coLeader2 = ?, coLeader2Discord = ?, coLeader2Phone = ?,
-                    type = ?, editReason = ?, password = ?
+                    type = ?, logoUrl = ?, editReason = ?, password = ?
                 WHERE id = ?
                 """,
                 (
                     req["fullName"], req["abbreviation"], req["colorTheme"], req["leader"],
                     req["leaderDiscord"], req["leaderPhone"], req["coLeader1"], req["coLeader1Discord"],
                     req["coLeader1Phone"], req["coLeader2"], req["coLeader2Discord"], req["coLeader2Phone"],
-                    req["type"], req["editReason"], req["newPassword"], req["gangId"],
+                    req["type"], req["logoUrl"], req["editReason"], req["newPassword"], req["gangId"],
                 ),
             )
         else:
@@ -339,14 +340,14 @@ def approve_gang_edit_request(id):
                 UPDATE gangs SET
                     fullName = ?, abbreviation = ?, colorTheme = ?, leader = ?, leaderDiscord = ?, leaderPhone = ?,
                     coLeader1 = ?, coLeader1Discord = ?, coLeader1Phone = ?, coLeader2 = ?, coLeader2Discord = ?, coLeader2Phone = ?,
-                    type = ?, editReason = ?
+                    type = ?, logoUrl = ?, editReason = ?
                 WHERE id = ?
                 """,
                 (
                     req["fullName"], req["abbreviation"], req["colorTheme"], req["leader"],
                     req["leaderDiscord"], req["leaderPhone"], req["coLeader1"], req["coLeader1Discord"],
                     req["coLeader1Phone"], req["coLeader2"], req["coLeader2Discord"], req["coLeader2Phone"],
-                    req["type"], req["editReason"], req["gangId"],
+                    req["type"], req["logoUrl"], req["editReason"], req["gangId"],
                 ),
             )
         db.execute(
@@ -892,6 +893,90 @@ def update_welfare_status(id):
 
 
 # ---------------------------------------------------------------------------
+# Welfare Items
+# ---------------------------------------------------------------------------
+@app.route("/api/welfare-items", methods=["GET"])
+def get_welfare_items():
+    db = get_db()
+    try:
+        rows = db.execute("SELECT * FROM welfare_items WHERE active = 1 ORDER BY id ASC").fetchall()
+        return jsonify({"success": True, "items": [row_to_dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "items": [], "message": "❌ ไม่สามารถดึงข้อมูลสวัสดิการได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare-items", methods=["POST"])
+def create_welfare_item():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    item_type = (data.get("type") or "").strip()
+    if not name or not item_type:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกชื่อและประเภทสวัสดิการ"}), 400
+    db = get_db()
+    try:
+        db.execute(
+            "INSERT INTO welfare_items (name, type, active, createdAt) VALUES (?, ?, 1, ?)",
+            (name, item_type, now_thai()),
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "✅ เพิ่มรายการสวัสดิการสำเร็จ"})
+    except sqlite3.IntegrityError:
+        return jsonify({"success": False, "message": "⚠️ ชื่อสวัสดิการซ้ำในระบบ"}), 409
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถเพิ่มรายการสวัสดิการได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare-items/<int:item_id>", methods=["PATCH"])
+def update_welfare_item(item_id):
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    item_type = (data.get("type") or "").strip()
+    active = data.get("active")
+    if not name and not item_type and active is None:
+        return jsonify({"success": False, "message": "❌ ไม่มีข้อมูลที่ต้องการแก้ไข"}), 400
+    updates = []
+    params = []
+    if name:
+        updates.append("name = ?")
+        params.append(name)
+    if item_type:
+        updates.append("type = ?")
+        params.append(item_type)
+    if active is not None:
+        updates.append("active = ?")
+        params.append(1 if active else 0)
+    params.append(item_id)
+    db = get_db()
+    try:
+        db.execute(f"UPDATE welfare_items SET {', '.join(updates)} WHERE id = ?", params)
+        db.commit()
+        return jsonify({"success": True, "message": "✅ แก้ไขรายการสวัสดิการสำเร็จ"})
+    except sqlite3.IntegrityError:
+        return jsonify({"success": False, "message": "⚠️ ชื่อสวัสดิการซ้ำในระบบ"}), 409
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถแก้ไขรายการสวัสดิการได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare-items/<int:item_id>", methods=["DELETE"])
+def delete_welfare_item(item_id):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM welfare_items WHERE id = ?", (item_id,))
+        db.commit()
+        return jsonify({"success": True, "message": "🗑️ ลบรายการสวัสดิการสำเร็จ"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถลบรายการสวัสดิการได้"}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # Council Users
 # ---------------------------------------------------------------------------
 @app.route("/api/council/login", methods=["POST"])
@@ -1107,6 +1192,162 @@ def delete_admin_user(id):
         return jsonify({"success": True, "message": "🗑️ ลบบัญชีแอดมินเรียบร้อยแล้ว"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถลบบัญชีแอดมินได้"}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Welfare Season Management
+# ---------------------------------------------------------------------------
+@app.route("/api/welfare-seasons", methods=["GET"])
+def get_welfare_seasons():
+    db = get_db()
+    try:
+        rows = db.execute("SELECT * FROM welfare_seasons ORDER BY createdAt DESC").fetchall()
+        seasons = []
+        for r in rows:
+            s = row_to_dict(r)
+            weapons = db.execute(
+                "SELECT * FROM welfare_season_weapons WHERE seasonId = ? ORDER BY id ASC",
+                (r["id"],),
+            ).fetchall()
+            s["weapons"] = [row_to_dict(w) for w in weapons]
+            s["allowedTypes"] = json.loads(s["allowedTypes"] or "[]")
+            s["selectedGangs"] = json.loads(s["selectedGangs"] or "[]")
+            seasons.append(s)
+        return jsonify({"success": True, "seasons": seasons})
+    except Exception as e:
+        return jsonify({"success": False, "seasons": [], "message": "❌ ไม่สามารถดึงข้อมูลซีซันได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare-seasons", methods=["POST"])
+def create_welfare_season():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกชื่อซีซัน"}), 400
+    db = get_db()
+    try:
+        kind = data.get("kind") or "regular"
+        start = data.get("startDate") or None
+        end = data.get("endDate") or None
+        active = 1 if data.get("active", True) else 0
+        allowed = json.dumps(data.get("allowedTypes") or [])
+        gang_sel = data.get("gangSelection") or "all"
+        selected = json.dumps(data.get("selectedGangs") or [])
+        cur = db.execute(
+            """
+            INSERT INTO welfare_seasons (name, kind, startDate, endDate, active, allowedTypes, gangSelection, selectedGangs, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (name, kind, start, end, active, allowed, gang_sel, selected, now_thai()),
+        )
+        db.commit()
+        season_id = cur.lastrowid
+        created = db.execute("SELECT * FROM welfare_seasons WHERE id = ?", (season_id,)).fetchone()
+        return jsonify({"success": True, "message": "✅ เพิ่มซีซันสำเร็จ", "season": row_to_dict(created)})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถเพิ่มซีซันได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare-seasons/<int:season_id>", methods=["PATCH"])
+def update_welfare_season(season_id):
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    try:
+        season = db.execute("SELECT * FROM welfare_seasons WHERE id = ?", (season_id,)).fetchone()
+        if not season:
+            return jsonify({"success": False, "message": "❌ ไม่พบซีซัน"}), 404
+        updates = []
+        params = []
+        if "name" in data:
+            updates.append("name = ?")
+            params.append((data["name"] or "").strip())
+        if "kind" in data:
+            updates.append("kind = ?")
+            params.append(data["kind"])
+        if "startDate" in data:
+            updates.append("startDate = ?")
+            params.append(data["startDate"] or None)
+        if "endDate" in data:
+            updates.append("endDate = ?")
+            params.append(data["endDate"] or None)
+        if "active" in data:
+            updates.append("active = ?")
+            params.append(1 if data["active"] else 0)
+        if "allowedTypes" in data:
+            updates.append("allowedTypes = ?")
+            params.append(json.dumps(data["allowedTypes"] or []))
+        if "gangSelection" in data:
+            updates.append("gangSelection = ?")
+            params.append(data["gangSelection"] or "all")
+        if "selectedGangs" in data:
+            updates.append("selectedGangs = ?")
+            params.append(json.dumps(data["selectedGangs"] or []))
+        if not updates:
+            return jsonify({"success": False, "message": "❌ ไม่มีข้อมูลที่ต้องการแก้ไข"}), 400
+        params.append(season_id)
+        db.execute(f"UPDATE welfare_seasons SET {', '.join(updates)} WHERE id = ?", params)
+        db.commit()
+        return jsonify({"success": True, "message": "✅ แก้ไขซีซันสำเร็จ"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถแก้ไขซีซันได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare-seasons/<int:season_id>", methods=["DELETE"])
+def delete_welfare_season(season_id):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM welfare_seasons WHERE id = ?", (season_id,))
+        db.commit()
+        return jsonify({"success": True, "message": "🗑️ ลบซีซันเรียบร้อยแล้ว"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถลบซีซันได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare-seasons/<int:season_id>/weapons", methods=["POST"])
+def set_welfare_season_weapons(season_id):
+    data = request.get_json(silent=True) or {}
+    weapons = data.get("weapons") or []
+    if not isinstance(weapons, list):
+        return jsonify({"success": False, "message": "❌ ข้อมูลอาวุธไม่ถูกต้อง"}), 400
+    db = get_db()
+    try:
+        season = db.execute("SELECT id FROM welfare_seasons WHERE id = ?", (season_id,)).fetchone()
+        if not season:
+            return jsonify({"success": False, "message": "❌ ไม่พบซีซัน"}), 404
+        # Normalize and deduplicate
+        seen = set()
+        inserts = []
+        for w in weapons:
+            t = (w.get("type") or "").strip()
+            name = (w.get("weapon") or "").strip()
+            if not t or not name:
+                continue
+            key = (t, name)
+            if key in seen:
+                continue
+            seen.add(key)
+            inserts.append((t, name))
+        # Replace all weapons for this season
+        db.execute("DELETE FROM welfare_season_weapons WHERE seasonId = ?", (season_id,))
+        for t, name in inserts:
+            db.execute(
+                "INSERT INTO welfare_season_weapons (seasonId, type, weapon) VALUES (?, ?, ?)",
+                (season_id, t, name),
+            )
+        db.commit()
+        return jsonify({"success": True, "message": "✅ บันทึกรายการอาวุธสำเร็จ"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถบันทึกอาวุธได้"}), 500
     finally:
         db.close()
 

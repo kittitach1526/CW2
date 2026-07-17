@@ -21,7 +21,7 @@ export default function Home() {
 
   return (
     <div 
-      className="relative flex flex-col items-center justify-center min-h-screen bg-cover bg-center bg-no-repeat font-sans antialiased py-10"
+      className="relative flex flex-col items-center justify-center min-h-screen bg-cover bg-center bg-no-repeat bg-fixed font-sans antialiased py-10"
       style={{ backgroundImage: "url('COUNCIL.PNG')" }}
     >
       <div className="absolute inset-0 bg-zinc-950/60 dark:bg-black/75 backdrop-blur-[2px]" />
@@ -116,12 +116,22 @@ export default function Home() {
             {/* 5. URL โลโก้แก๊ง */}
             <div className="flex flex-col gap-2 sm:col-span-2">
               <label className="text-sm font-medium text-zinc-200">URL โลโก้แก๊ง (Logo URL)</label>
-              <input 
-                type="url" 
-                name="logoUrl" 
-                placeholder="เช่น https://imgur.com/your-gang-logo.png" 
-                className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" 
-              />
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input 
+                  type="url" 
+                  name="logoUrl" 
+                  placeholder="เช่น https://imgur.com/your-gang-logo.png" 
+                  className="flex-1 h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" 
+                />
+                <a
+                  href="https://imgbb.com/upload"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-11 px-4 rounded-xl bg-zinc-800 text-zinc-200 border border-white/10 hover:bg-zinc-700 text-sm font-medium flex items-center justify-center transition-all"
+                >
+                  อัปโหลดรูปที่ imgbb
+                </a>
+              </div>
               <span className="text-[11px] text-zinc-400">*(แนะนำให้อัปโหลดรูปขึ้นเว็บฝากรูป เช่น Imgur หรือ Discord แล้วนำลิงก์มาวาง)*</span>
             </div>
 
