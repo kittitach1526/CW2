@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { createRegistration } from "../register"; // 👈 นำเข้า Server Action จากไฟล์ register.ts
+import { useStatusModal } from "../components/StatusModalProvider";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [colorTheme, setColorTheme] = useState("#3b82f6"); // State สำหรับผูกค่าสี HEX และ Color Picker
+  const showStatus = useStatusModal();
 
   // ฟังก์ชันครอบตอนกด Submit ฟอร์ม
   const clientAction = async (formData: FormData) => {
@@ -14,9 +16,9 @@ export default function Home() {
     
     // เรียกใช้ Server Action เหมือนฟังก์ชันธรรมดาตัวหนึ่ง
     const result = await createRegistration(formData);
-    
+
     setLoading(false);
-    alert(result.message);
+    showStatus({ type: result.success ? "success" : "error", message: result.message });
   };
 
   return (

@@ -8,7 +8,9 @@ import {
   updateWelfareStatus,
   getAllUniformFiles,
   updateUniformStatus,
+  getLeaveRequests,
 } from "../register";
+import { useStatusModal } from "../components/StatusModalProvider";
 
 type AdminData = {
   id: number;
@@ -25,8 +27,12 @@ type WelfareRequest = {
   requestName: string;
   discordId: string;
   welfareItem: string;
+  requestType?: string;
   status: string;
   createdAt: string;
+  details?: any;
+  hasWelfare?: boolean;
+  activeWelfareItems?: any[];
 };
 
 type UniformFile = {
@@ -43,14 +49,19 @@ type UniformFile = {
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const showStatus = useStatusModal();
   const [adminData, setAdminData] = useState<AdminData | null>(null);
+  const currentActor = adminData?.name || adminData?.username || "แอดมิน";
+  const currentActorRole = "admin";
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<"welfare" | "outfit">("welfare");
+  const [activeTab, setActiveTab] = useState<"welfare" | "outfit" | "leave">("welfare");
   const [loading, setLoading] = useState(false);
   const [welfareRequests, setWelfareRequests] = useState<WelfareRequest[]>([]);
   const [uniformFiles, setUniformFiles] = useState<UniformFile[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<WelfareRequest[]>([]);
   const [selectedGang, setSelectedGang] = useState<string>("ทั้งหมด");
   const [selectedOutfitGang, setSelectedOutfitGang] = useState<string>("ทั้งหมด");
+  const [selectedLeaveGang, setSelectedLeaveGang] = useState<string>("ทั้งหมด");
 
   const filteredWelfareRequests = useMemo(() => {
     if (selectedGang === "ทั้งหมด") return welfareRequests;
@@ -70,6 +81,15 @@ export default function AdminDashboard() {
     return ["ทั้งหมด", ...Array.from(new Set(uniformFiles.map((f) => f.gangName).filter(Boolean)))];
   }, [uniformFiles]);
 
+  const filteredLeaveRequests = useMemo(() => {
+    if (selectedLeaveGang === "ทั้งหมด") return leaveRequests;
+    return leaveRequests.filter((r) => r.gangAbbreviation === selectedLeaveGang);
+  }, [leaveRequests, selectedLeaveGang]);
+
+  const leaveGangOptions = useMemo(() => {
+    return ["ทั้งหมด", ...Array.from(new Set(leaveRequests.map((r) => r.gangAbbreviation).filter(Boolean)))];
+  }, [leaveRequests]);
+
   useEffect(() => {
     setMounted(true);
     const saved = localStorage.getItem("currentAdmin");
@@ -84,7 +104,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (mounted && !adminData) {
-      alert("🔒 กรุณาเข้าสู่ระบบด้วยบัญชีผู้ดูแลระบบก่อน");
+      showStatus({ type: "error", message: "🔒 กรุณาเข้าสู่ระบบด้วยบัญชีผู้ดูแลระบบก่อน" });
       router.push("/admin-login");
     }
   }, [mounted, adminData, router]);
@@ -103,6 +123,11 @@ export default function AdminDashboard() {
         if (activeTab === "outfit") {
           const uniformResult = await getAllUniformFiles();
           setUniformFiles(uniformResult.success ? uniformResult.files || [] : []);
+        }
+
+        if (activeTab === "leave") {
+          const leaveResult = await getLeaveRequests();
+          setLeaveRequests(leaveResult.success ? leaveResult.requests || [] : []);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -134,35 +159,52 @@ export default function AdminDashboard() {
 
   const handleWelfareAction = async (id: number, status: "รับไปแล้ว" | "เอาออกแล้ว" | "เอาสวัสดิการออกแล้ว") => {
     try {
-      const result = await updateWelfareStatus(id, status);
+      const result = await updateWelfareStatus(id, status, currentActor, currentActorRole);
       if (result.success) {
-        alert(result.message);
+        showStatus({ type: "success", message: result.message });
         setWelfareRequests((prev) =>
           prev.map((req) => (req.id === id ? { ...req, status } : req))
         );
       } else {
-        alert(result.message);
+        showStatus({ type: "error", message: result.message });
       }
     } catch (error) {
       console.error(error);
-      alert("❌ ไม่สามารถอัปเดตสถานะสวัสดิการได้");
+      showStatus({ type: "error", message: "❌ ไม่สามารถอัปเดตสถานะสวัสดิการได้" });
+    }
+  };
+
+  const handleLeaveAction = async (id: number, status: string) => {
+    try {
+      const result = await updateWelfareStatus(id, status, currentActor, currentActorRole);
+      if (result.success) {
+        showStatus({ type: "success", message: result.message });
+        setLeaveRequests((prev) =>
+          prev.map((req) => (req.id === id ? { ...req, status } : req))
+        );
+      } else {
+        showStatus({ type: "error", message: result.message });
+      }
+    } catch (error) {
+      console.error(error);
+      showStatus({ type: "error", message: "❌ ไม่สามารถอัปเดตสถานะคำขอออกลอยได้" });
     }
   };
 
   const handleOutfitAction = async (id: number, status: "ลงแล้ว" | "ปฏิเสธ") => {
     try {
-      const result = await updateUniformStatus(id, status);
+      const result = await updateUniformStatus(id, status, currentActor, currentActorRole);
       if (result.success) {
-        alert(result.message);
+        showStatus({ type: result.success ? "success" : "error", message: result.message });
         setUniformFiles((prev) =>
           prev.map((file) => (file.id === id ? { ...file, status } : file))
         );
       } else {
-        alert(result.message);
+        showStatus({ type: result.success ? "success" : "error", message: result.message });
       }
     } catch (error) {
       console.error(error);
-      alert("❌ ไม่สามารถอัปเดตสถานะชุดได้");
+      showStatus({ type: "error", message: "❌ ไม่สามารถอัปเดตสถานะชุดได้" });
     }
   };
 
@@ -212,7 +254,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Tab Selection - สไตล์หน้า select */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
           <button
             onClick={() => setActiveTab("welfare")}
             className={`group flex flex-col items-center sm:items-start gap-3 p-6 rounded-2xl border text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg text-center sm:text-left ${
@@ -248,6 +290,25 @@ export default function AdminDashboard() {
             <div>
               <h3 className="text-lg font-bold">ชุด / ไฟล์</h3>
               <p className="text-xs text-zinc-300/80 mt-1 font-light">ตรวจสอบและอัปเดตสถานะไฟล์ชุดที่ส่งเข้ามา</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("leave")}
+            className={`group flex flex-col items-center sm:items-start gap-3 p-6 rounded-2xl border text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-lg text-center sm:text-left ${
+              activeTab === "leave"
+                ? "bg-gradient-to-br from-red-600/30 to-rose-600/30 border-red-400/50"
+                : "bg-white/5 border-white/10 hover:bg-white/10"
+            }`}
+          >
+            <div className={`p-3 rounded-xl transition-transform group-hover:scale-110 ${activeTab === "leave" ? "bg-red-500/20 text-red-300" : "bg-white/10 text-zinc-300"}`}>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold">ออกลอย</h3>
+              <p className="text-xs text-zinc-300/80 mt-1 font-light">จัดการคำขอออก-ออกลอยและสวัสดิการค้าง</p>
             </div>
           </button>
         </div>
@@ -428,6 +489,96 @@ export default function AdminDashboard() {
                             </div>
                           ) : (
                             <span className="text-zinc-500 text-xs">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {!loading && activeTab === "leave" && (
+            <div className="overflow-x-auto">
+              <div className="flex flex-col sm:flex-row gap-4 p-4 border-b border-white/10 bg-white/5">
+                <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                  <span>กรองตามแก๊ง</span>
+                  <select
+                    value={selectedLeaveGang}
+                    onChange={(e) => setSelectedLeaveGang(e.target.value)}
+                    className="h-10 px-3 rounded-xl bg-zinc-950 border border-white/10 text-zinc-200 text-sm focus:outline-none focus:border-red-400"
+                  >
+                    {leaveGangOptions.map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </label>
+                <span className="text-xs text-zinc-500 flex items-center">แสดง {filteredLeaveRequests.length} รายการ</span>
+              </div>
+              <table className="w-full text-xs text-left whitespace-nowrap">
+                <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/10 font-medium">
+                  <tr>
+                    <th className="px-6 py-4">แก๊ง</th>
+                    <th className="px-6 py-4">ผู้ยื่นเรื่อง (Discord)</th>
+                    <th className="px-6 py-4">คนออก</th>
+                    <th className="px-6 py-4">สวัสดิการค้าง</th>
+                    <th className="px-6 py-4">สถานะ</th>
+                    <th className="px-6 py-4 text-center">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10 text-zinc-300">
+                  {filteredLeaveRequests.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-20 text-zinc-500 font-light tracking-wide">
+                        📭 ไม่มีคำขอออกลอย
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLeaveRequests.map((req) => (
+                      <tr key={req.id} className="hover:bg-white/5 transition-colors">
+                        <td className="px-6 py-4 font-semibold text-white">
+                          {req.gangName}{" "}
+                          <span className="text-zinc-500 font-normal">[{req.gangAbbreviation}]</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="block text-zinc-300 font-medium">{req.requestName}</span>
+                          <span className="text-[10px] text-zinc-500 font-mono">{req.discordId}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="block text-zinc-300 font-medium">{req.details?.leaveName || "-"}</span>
+                          <span className="text-[10px] text-zinc-500 font-mono">{req.details?.leaveDiscord || "-"}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {req.hasWelfare ? (
+                            <span className="text-rose-400 font-medium">
+                              {req.activeWelfareItems?.map((i: any) => i.welfareItem).join(", ")}
+                            </span>
+                          ) : (
+                            <span className="text-zinc-500">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[10px] px-2.5 py-1 rounded-md bg-white/5 text-zinc-300 border border-white/10 font-mono">
+                            {req.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {req.status === "รอรับ" ? (
+                            req.hasWelfare ? (
+                              <span className="text-[10px] text-rose-400 font-medium">ต้องเอาสวัสดิการออก</span>
+                            ) : (
+                              <button
+                                onClick={() => handleLeaveAction(req.id, "เอาสวัสดิการออกแล้ว")}
+                                className="px-4 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg transition-all text-[11px]"
+                              >
+                                เอาสวัสดิการออกแล้ว
+                              </button>
+                            )
+                          ) : (
+                            <span className="text-zinc-500 text-xs">
+                              {req.status === "เอาสวัสดิการออกแล้ว" ? "✓ เอาสวัสดิการออกแล้ว" : "-"}
+                            </span>
                           )}
                         </td>
                       </tr>

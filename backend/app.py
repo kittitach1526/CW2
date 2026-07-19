@@ -30,6 +30,297 @@ def row_to_dict(row):
     return {key: row[key] for key in row.keys()}
 
 
+def _parse_details(details):
+    """Parse a JSON details string/dict into a dict."""
+    if isinstance(details, dict):
+        return details
+    if not details:
+        return {}
+    try:
+        return json.loads(details)
+    except Exception:
+        return {}
+
+
+def _normalize(value):
+    """Normalize a string value for loose comparison."""
+    if value is None:
+        return ""
+    return str(value).strip().lower()
+
+
+def _active_welfare_for_person(db, gang_abbreviation, name, discord, phone=None):
+    """Return active receive welfare items held by a person, matched by name/discord/phone."""
+    if not gang_abbreviation:
+        return []
+
+    name_norm = _normalize(name)
+    discord_norm = _normalize(discord)
+    phone_norm = _normalize(phone)
+
+    rows = db.execute(
+        """
+        SELECT * FROM welfare_requests
+        WHERE gangAbbreviation = ? AND requestType = 'receive' AND status = 'รับไปแล้ว'
+        """,
+        (gang_abbreviation,),
+    ).fetchall()
+
+    items = []
+    for row in rows:
+        d = _parse_details(row["details"])
+        receiver_name = _normalize(d.get("receiverName"))
+        receiver_discord = _normalize(d.get("receiverDiscord"))
+        receiver_phone = _normalize(d.get("receiverPhone"))
+
+        matched = False
+        if discord_norm and receiver_discord and discord_norm == receiver_discord:
+            matched = True
+        elif name_norm and receiver_name and name_norm == receiver_name:
+            matched = True
+        elif phone_norm and receiver_phone and phone_norm == receiver_phone:
+            matched = True
+
+        if matched:
+            items.append({"id": row["id"], "welfareItem": row["welfareItem"], "details": d})
+
+    return items
+
+
+def _actor_from_data(data, default_actor='system', default_role='system'):
+    """Extract actor name and role from request data."""
+    actor = data.get('actor')
+    actor_role = data.get('actorRole')
+    if not actor:
+        actor = data.get('reporter') or data.get('reviewer') or data.get('requestName') or data.get('username') or data.get('abbreviation') or data.get('gangName') or data.get('approver') or data.get('name') or default_actor
+    if not actor_role:
+        actor_role = default_role
+    return actor, actor_role
+
+
+def _target_name_from_locals(locals_):
+    """Find a human-readable target name from caller local variables."""
+    name_keys = ('fullName', 'name', 'gangName', 'abbreviation', 'uniformType', 'welfareItem')
+    for value in locals_.values():
+        if not hasattr(value, 'keys'):
+            continue
+        for key in name_keys:
+            try:
+                if key in value and value[key]:
+                    return value[key]
+            except Exception:
+                continue
+    return None
+
+
+def _build_log_description(action, actor, actor_role, target_type, target_id, target_name, details, created_at):
+    """Build a human-readable Thai sentence describing the action."""
+    actor = actor or "system"
+    actor_role = actor_role or "system"
+
+    d = details if isinstance(details, dict) else {}
+    status = d.get("status")
+    reason = d.get("reason")
+    request_type = d.get("requestType")
+    approver = d.get("approver")
+    reviewer = d.get("reviewer")
+    duration = d.get("durationDays")
+    leave_name = d.get("leaveName")
+    welfare_item = d.get("welfareItem") or d.get("welfareItemName")
+    uniform_type = d.get("uniformType")
+    weapon_type = d.get("weaponType")
+    car_type = d.get("carType")
+    license_plate = d.get("licensePlate")
+
+    action_labels = {
+        "register_gang": "ลงทะเบียนแก๊ง",
+        "login_gang": "เข้าสู่ระบบแก๊ง",
+        "update_gang_status": "อัปเดตสถานะแก๊ง",
+        "create_gang_edit_request": "ส่งคำขอแก้ไขข้อมูลแก๊ง",
+        "approve_gang_edit_request": "อนุมัติคำขอแก้ไขข้อมูลแก๊ง",
+        "reject_gang_edit_request": "ปฏิเสธคำขอแก้ไขข้อมูลแก๊ง",
+        "request_disband_gang": "ส่งคำขอยุบแก๊ง",
+        "approve_disband_request": "อนุมัติคำขอยุบแก๊ง",
+        "reject_disband_request": "ปฏิเสธคำขอยุบแก๊ง",
+        "request_pause_gang": "ส่งคำขอพักแก๊ง",
+        "approve_pause_request": "อนุมัติคำขอพักแก๊ง",
+        "reject_pause_request": "ปฏิเสธคำขอพักแก๊ง",
+        "report_pause_request": "รายงานตัวหลังพักแก๊ง",
+        "create_uniform_file": "ส่งไฟล์ชุด",
+        "update_uniform_file_link": "อัปเดตลิงก์ไฟล์ชุด",
+        "update_uniform_status": "อัปเดตสถานะไฟล์ชุด",
+        "create_welfare_request": "ส่งคำขอสวัสดิการ",
+        "update_welfare_status": "อัปเดตสถานะสวัสดิการ",
+        "create_welfare_item": "สร้างรายการสวัสดิการ",
+        "update_welfare_item": "แก้ไขรายการสวัสดิการ",
+        "delete_welfare_item": "ลบรายการสวัสดิการ",
+        "create_council_user": "สร้างบัญชีสภา",
+        "update_council_user_status": "อัปเดตสถานะบัญชีสภา",
+        "delete_council_user": "ลบบัญชีสภา",
+        "create_admin_user": "สร้างบัญชีแอดมิน",
+        "update_admin_user_status": "อัปเดตสถานะบัญชีแอดมิน",
+        "delete_admin_user": "ลบบัญชีแอดมิน",
+        "create_welfare_season": "สร้าง Season สวัสดิการ",
+        "update_welfare_season": "แก้ไข Season สวัสดิการ",
+        "delete_welfare_season": "ลบ Season สวัสดิการ",
+        "set_welfare_season_weapons": "ตั้งค่าอาวุธประจำ Season สวัสดิการ",
+    }
+    action_label = action_labels.get(action, action or "ทำรายการ")
+
+    target_str = ""
+    if target_id and target_name:
+        target_str = f"#{target_id} ({target_name})"
+    elif target_id:
+        target_str = f"#{target_id}"
+    elif target_name:
+        target_str = target_name
+
+    extra = []
+    if request_type:
+        extra.append(f"ประเภท {request_type}")
+    if welfare_item:
+        extra.append(f"สิ่งของ {welfare_item}")
+    if uniform_type:
+        extra.append(f"ชุด {uniform_type}")
+    if weapon_type:
+        extra.append(f"อาวุธ {weapon_type}")
+    if car_type:
+        extra.append(f"รถ {car_type}")
+    if license_plate:
+        extra.append(f"ป้าย {license_plate}")
+    if leave_name:
+        extra.append(f"ผู้ออกลอย {leave_name}")
+    if approver:
+        extra.append(f"ผู้อนุมัติ/ส่งเรื่อง {approver}")
+    if reviewer:
+        extra.append(f"ผู้พิจารณา {reviewer}")
+    if duration:
+        extra.append(f"ระยะเวลา {duration} วัน")
+    if status:
+        extra.append(f"→ สถานะ {status}")
+    if reason:
+        extra.append(f"เหตุผล {reason}")
+    extra_str = " | ".join(extra)
+
+    parts = [f"{actor} ({actor_role})", action_label]
+    if target_str:
+        parts.append(target_str)
+    if extra_str:
+        parts.append(extra_str)
+    parts.append(f"เมื่อ {created_at}")
+    return " ".join(parts)
+
+
+def _log_action(db, action=None, target_type=None, target_id=None, target_name=None, details=None, default_actor='system', default_role='system'):
+    """Insert a system log row. Try to derive context from the caller when not provided."""
+    try:
+        import inspect
+        frame = inspect.currentframe()
+        caller = frame.f_back if frame else None
+        if not caller:
+            return
+
+        locals_ = caller.f_locals
+        data = locals_.get('data') or {}
+        if action is None:
+            action = caller.f_code.co_name
+
+        # Resolve actor
+        actor, actor_role = _actor_from_data(data, default_actor, default_role)
+
+        # Resolve target type from caller name if not supplied
+        if target_type is None:
+            func_name = caller.f_code.co_name
+            if 'gang_edit' in func_name:
+                target_type = 'gang_edit_request'
+            elif 'disband' in func_name:
+                target_type = 'disband_request'
+            elif 'pause' in func_name:
+                target_type = 'pause_request'
+            elif 'uniform' in func_name:
+                target_type = 'uniform_file'
+            elif 'welfare' in func_name:
+                if 'item' in func_name:
+                    target_type = 'welfare_item'
+                else:
+                    target_type = 'welfare_request'
+            elif 'council' in func_name:
+                target_type = 'council_user'
+            elif 'admin' in func_name:
+                target_type = 'admin_user'
+            elif 'season' in func_name:
+                target_type = 'welfare_season'
+            elif 'gang' in func_name:
+                target_type = 'gang'
+            else:
+                target_type = 'system'
+
+        # Resolve target id from caller locals or last row id
+        if target_id is None:
+            for key in ('id', 'item_id', 'season_id', 'gang_id'):
+                if key in locals_ and locals_[key] is not None:
+                    target_id = locals_[key]
+                    break
+        if target_id is None:
+            for key in ('created', 'updated', 'pending', 'existing', 'req'):
+                value = locals_.get(key)
+                if value and hasattr(value, 'keys') and 'id' in value and value['id'] is not None:
+                    target_id = value['id']
+                    break
+        if target_id is None or target_id == 0:
+            try:
+                target_id = db.lastrowid
+            except Exception:
+                target_id = None
+        if target_id is None or target_id == 0:
+            try:
+                row = db.execute("SELECT last_insert_rowid()").fetchone()
+                target_id = row[0] if row else None
+            except Exception:
+                target_id = None
+
+        # Resolve target name
+        if target_name is None:
+            if isinstance(data, dict):
+                target_name = data.get('fullName') or data.get('name') or data.get('gangName') or data.get('abbreviation') or data.get('uniformType') or data.get('welfareItem')
+        if not target_name:
+            target_name = _target_name_from_locals(locals_)
+
+        # Build details from request data when not provided (exclude sensitive fields)
+        if details is None:
+            details = {}
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    if key in ('password', 'newPassword', 'passwordConfirm'):
+                        continue
+                    if value is not None:
+                        details[key] = value
+
+        created_at = now_thai()
+        description = _build_log_description(action, actor, actor_role, target_type, target_id, target_name, details, created_at)
+
+        db.execute(
+            """
+            INSERT INTO system_logs (actor, actorRole, action, targetType, targetId, targetName, details, description, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                actor,
+                actor_role,
+                action,
+                target_type,
+                target_id,
+                target_name,
+                json.dumps(details, ensure_ascii=False) if details else None,
+                description,
+                created_at,
+            ),
+        )
+        db.commit()
+    except Exception as e:
+        print("[log_action error]", e)
+
+
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"ok": True})
@@ -82,6 +373,7 @@ def register_gang():
             ),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "🎉 ลงทะเบียนแก๊งสำเร็จเรียบร้อยแล้วครับ!"}), 201
     except Exception as e:
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการบันทึกข้อมูลลงระบบ"}), 500
@@ -137,6 +429,7 @@ def update_gang_status(id):
     try:
         db.execute("UPDATE gangs SET status = ? WHERE id = ?", (status, id))
         db.commit()
+        _log_action(db)
         msg = f"✨ เปลี่ยนสถานะแก๊งเป็น '{status}' เรียบร้อยแล้ว"
         if status == "approved":
             msg = "🎉 อนุมัติสิทธิ์ภาคีเครือข่ายแก๊งเข้าสู่ระบบสภากลางสำเร็จ!"
@@ -241,6 +534,7 @@ def create_gang_edit_request(gang_id):
             ),
         )
         db.commit()
+        _log_action(db)
         created_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
         created = db.execute(
             "SELECT * FROM gang_edit_requests WHERE id = ?", (created_id,)
@@ -355,6 +649,7 @@ def approve_gang_edit_request(id):
             (reviewer, now_thai(), id),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✅ อนุมัติการแก้ไขข้อมูลแก๊งสำเร็จแล้ว"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการอนุมัติคำขอ"}), 500
@@ -377,6 +672,7 @@ def reject_gang_edit_request(id):
             (reviewer, now_thai(), id),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✕ ปฏิเสธคำขอแก้ไขข้อมูลแก๊งแล้ว"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการปฏิเสธคำขอ"}), 500
@@ -419,6 +715,7 @@ def request_disband_gang():
                 (gang["id"], reason or None, approver or None, now_thai()),
             )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "⚠️ ส่งเรื่องขอยุบแก๊งไปยังระบบสภากลางเรียบร้อยแล้ว กรุณารอสภาพิจารณา"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในระบบฐานข้อมูล"}), 500
@@ -491,6 +788,7 @@ def approve_disband_request(id):
             (reviewer, now_thai(), id),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✅ อนุมัติคำขอยุบแก๊งแล้ว สถานะแก๊งเปลี่ยนเป็น 'รอยุบ'"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการอนุมัติคำขอยุบแก๊ง"}), 500
@@ -513,6 +811,7 @@ def reject_disband_request(id):
             (reviewer, now_thai(), id),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✕ ปฏิเสธคำขอยุบแก๊งแล้ว"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการปฏิเสธคำขอ"}), 500
@@ -563,6 +862,7 @@ def request_pause_gang():
             (gang["id"], reason or None, approver or None, duration_days, now_thai()),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "⏸️ ส่งคำขอพักแก๊งไปยังสภากลางแล้ว กรุณารออนุมัติ"})
     except Exception as e:
         print("[pause request error]", e)
@@ -642,6 +942,7 @@ def approve_pause_request(id):
         )
         db.execute("UPDATE gangs SET status = 'พัก' WHERE id = ?", (req["gangId"],))
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✅ อนุมัติคำขอพักแก๊งแล้ว สถานะแก๊งเปลี่ยนเป็น 'พัก'"})
     except Exception as e:
         print("[pause approve error]", e)
@@ -665,6 +966,7 @@ def reject_pause_request(id):
             (reviewer, now_thai(), id),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✕ ปฏิเสธคำขอพักแก๊งแล้ว"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการปฏิเสธคำขอ"}), 500
@@ -686,6 +988,7 @@ def report_pause_request(id):
         )
         db.execute("UPDATE gangs SET status = 'approved' WHERE id = ?", (req["gangId"],))
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✅ รายงานตัวแล้ว สถานะแก๊งกลับเป็นอนุมัติ"})
     except Exception as e:
         print("[pause report error]", e)
@@ -731,6 +1034,7 @@ def create_uniform_file():
             ),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "🎉 เพิ่มไฟล์ชุดเรียบร้อยแล้ว!"}), 201
     except Exception as e:
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการบันทึกไฟล์ชุด"}), 500
@@ -767,6 +1071,7 @@ def update_uniform_file_link(id):
             (new_file_url, reason, id),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "🔄 อัปเดตลิงก์ไฟล์ชุดใหม่ พร้อมเหตุผลเรียบร้อย ส่งเรื่องให้แอดมินตรวจสอบแล้ว!"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตไฟล์ชุดได้"}), 500
@@ -785,6 +1090,7 @@ def update_uniform_status(id):
     try:
         db.execute("UPDATE uniform_files SET status = ? WHERE id = ?", (status, id))
         db.commit()
+        _log_action(db)
         msg = (
             "👕 อัปเดตสถานะ: โมเดลชุดถูกติดตั้งเข้าเซิร์ฟเวอร์หลักเรียบร้อย!"
             if status == "ลงแล้ว"
@@ -869,6 +1175,31 @@ def create_welfare_request():
             ),
         )
         db.commit()
+        _log_action(db)
+
+        # สำหรับคำขอออก-ออกลอย ให้ตรวจสอบว่าคนออกยังมีสวัสดิการค้างอยู่หรือไม่
+        if request_type == "leave":
+            active_items = _active_welfare_for_person(
+                db,
+                gang_abbreviation,
+                details.get("leaveName"),
+                details.get("leaveDiscord"),
+                details.get("leavePhone"),
+            )
+            if active_items:
+                item_names = ", ".join({i["welfareItem"] for i in active_items})
+                return jsonify({
+                    "success": True,
+                    "message": f"📦 ส่งคำขอออก-ออกลอยแล้ว แต่ {details.get('leaveName')} ยังมีสวัสดิการ {item_names} ต้องเอาออกก่อนจึงจะอนุมัติได้",
+                    "hasWelfare": True,
+                    "activeWelfareItems": active_items,
+                }), 201
+            return jsonify({
+                "success": True,
+                "message": "📦 ส่งคำขอออก-ออกลอยไปยังระบบสภากลางเรียบร้อยแล้ว!",
+                "hasWelfare": False,
+            }), 201
+
         return jsonify({"success": True, "message": "📦 ส่งคำขอรับสวัสดิการไปยังระบบสภากลางเรียบร้อยแล้ว!"}), 201
     except Exception as e:
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในระบบฐานข้อมูล"}), 500
@@ -914,6 +1245,7 @@ def update_welfare_status(id):
     try:
         db.execute("UPDATE welfare_requests SET status = ? WHERE id = ?", (status, id))
         db.commit()
+        _log_action(db)
         if status == "รับไปแล้ว":
             msg = "✅ อนุมัติการแจกจ่ายพัสดุและทำเครื่องหมายส่งมอบแล้ว"
         elif status == "เอาสวัสดิการออกแล้ว":
@@ -923,6 +1255,36 @@ def update_welfare_status(id):
         return jsonify({"success": True, "message": msg})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตสถานะสวัสดิการได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare/leave", methods=["GET"])
+def get_leave_requests():
+    """Return all leave requests enriched with active welfare held by the leaving person."""
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT * FROM welfare_requests WHERE requestType = 'leave' ORDER BY id DESC"
+        ).fetchall()
+        result = []
+        for row in rows:
+            req = row_to_dict(row)
+            details = _parse_details(req.get("details"))
+            active = _active_welfare_for_person(
+                db,
+                req.get("gangAbbreviation"),
+                details.get("leaveName"),
+                details.get("leaveDiscord"),
+                details.get("leavePhone"),
+            )
+            req["details"] = details
+            req["activeWelfareItems"] = active
+            req["hasWelfare"] = bool(active)
+            result.append(req)
+        return jsonify({"success": True, "requests": result})
+    except Exception as e:
+        return jsonify({"success": False, "requests": [], "message": "❌ ไม่สามารถดึงข้อมูลคำขอออกลอยได้"}), 500
     finally:
         db.close()
 
@@ -968,6 +1330,7 @@ def create_welfare_item():
             (name, item_type, gang_limit, female_gang_limit, family_limit, now_thai()),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✅ เพิ่มรายการสวัสดิการสำเร็จ"})
     except sqlite3.IntegrityError:
         return jsonify({"success": False, "message": "⚠️ ชื่อสวัสดิการซ้ำในระบบ"}), 409
@@ -1011,6 +1374,7 @@ def update_welfare_item(item_id):
     try:
         db.execute(f"UPDATE welfare_items SET {', '.join(updates)} WHERE id = ?", params)
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✅ แก้ไขรายการสวัสดิการสำเร็จ"})
     except sqlite3.IntegrityError:
         return jsonify({"success": False, "message": "⚠️ ชื่อสวัสดิการซ้ำในระบบ"}), 409
@@ -1026,6 +1390,7 @@ def delete_welfare_item(item_id):
     try:
         db.execute("DELETE FROM welfare_items WHERE id = ?", (item_id,))
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "🗑️ ลบรายการสวัสดิการสำเร็จ"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถลบรายการสวัสดิการได้"}), 500
@@ -1115,6 +1480,7 @@ def create_council_user():
             (name, username, password, now_thai()),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✅ เพิ่มบัญชีสภากลางเรียบร้อยแล้ว"}), 201
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถเพิ่มบัญชีสภากลางได้"}), 500
@@ -1130,6 +1496,7 @@ def update_council_user_status(id):
     try:
         db.execute("UPDATE council_users SET status = ? WHERE id = ?", (status, id))
         db.commit()
+        _log_action(db)
         msg = "✅ เปิดใช้งานบัญชีสภาแล้ว" if status == "อนุมัติ" else "🔒 ระงับการใช้งานบัญชีสภาแล้ว"
         return jsonify({"success": True, "message": msg})
     except Exception as e:
@@ -1144,6 +1511,7 @@ def delete_council_user(id):
     try:
         db.execute("DELETE FROM council_users WHERE id = ?", (id,))
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "🗑️ ลบบัญชีสภาเรียบร้อยแล้ว"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถลบบัญชีสภาได้"}), 500
@@ -1217,6 +1585,7 @@ def create_admin_user():
             (name, username, password, now_thai()),
         )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✅ เพิ่มบัญชีแอดมินเรียบร้อยแล้ว"}), 201
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถเพิ่มบัญชีแอดมินได้"}), 500
@@ -1232,6 +1601,7 @@ def update_admin_user_status(id):
     try:
         db.execute("UPDATE admin_users SET status = ? WHERE id = ?", (status, id))
         db.commit()
+        _log_action(db)
         msg = "✅ เปิดใช้งานบัญชีแอดมินแล้ว" if status == "อนุมัติ" else "🔒 ระงับการใช้งานบัญชีแอดมินแล้ว"
         return jsonify({"success": True, "message": msg})
     except Exception as e:
@@ -1246,6 +1616,7 @@ def delete_admin_user(id):
     try:
         db.execute("DELETE FROM admin_users WHERE id = ?", (id,))
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "🗑️ ลบบัญชีแอดมินเรียบร้อยแล้ว"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถลบบัญชีแอดมินได้"}), 500
@@ -1302,6 +1673,7 @@ def create_welfare_season():
             (name, kind, start, end, active, allowed, gang_sel, selected, now_thai()),
         )
         db.commit()
+        _log_action(db)
         season_id = cur.lastrowid
         created = db.execute("SELECT * FROM welfare_seasons WHERE id = ?", (season_id,)).fetchone()
         return jsonify({"success": True, "message": "✅ เพิ่มซีซันสำเร็จ", "season": row_to_dict(created)})
@@ -1350,6 +1722,7 @@ def update_welfare_season(season_id):
         params.append(season_id)
         db.execute(f"UPDATE welfare_seasons SET {', '.join(updates)} WHERE id = ?", params)
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✅ แก้ไขซีซันสำเร็จ"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถแก้ไขซีซันได้"}), 500
@@ -1363,6 +1736,7 @@ def delete_welfare_season(season_id):
     try:
         db.execute("DELETE FROM welfare_seasons WHERE id = ?", (season_id,))
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "🗑️ ลบซีซันเรียบร้อยแล้ว"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถลบซีซันได้"}), 500
@@ -1407,6 +1781,7 @@ def set_welfare_season_weapons(season_id):
                 (season_id, t, name, quantity),
             )
         db.commit()
+        _log_action(db)
         return jsonify({"success": True, "message": "✅ บันทึกรายการอาวุธสำเร็จ"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถบันทึกอาวุธได้"}), 500
@@ -1486,6 +1861,50 @@ def get_welfare_remaining(gang_abbreviation):
         return jsonify({"success": True, "season": active_season_name, "weapons": result})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถดึงข้อมูลคงเหลือได้"}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# System Logs
+# ---------------------------------------------------------------------------
+@app.route("/api/logs", methods=["GET"])
+def get_system_logs():
+    """Return system action logs, optionally filtered and limited."""
+    actor = request.args.get("actor")
+    action = request.args.get("action")
+    target_type = request.args.get("targetType")
+    limit = request.args.get("limit", type=int) or 500
+
+    db = get_db()
+    try:
+        where = []
+        params = []
+        if actor:
+            where.append("actor = ?")
+            params.append(actor)
+        if action:
+            where.append("action = ?")
+            params.append(action)
+        if target_type:
+            where.append("targetType = ?")
+            params.append(target_type)
+
+        sql = "SELECT * FROM system_logs"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
+
+        rows = db.execute(sql, params).fetchall()
+        result = []
+        for row in rows:
+            log = row_to_dict(row)
+            log["details"] = _parse_details(log.get("details"))
+            result.append(log)
+        return jsonify({"success": True, "logs": result})
+    except Exception as e:
+        return jsonify({"success": False, "logs": [], "message": "❌ ไม่สามารถดึงข้อมูล log ได้"}), 500
     finally:
         db.close()
 

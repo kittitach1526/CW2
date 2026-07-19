@@ -19,9 +19,11 @@ import {
   getWelfareItems,
 } from "../register";
 import ImageUpload from "../components/ImageUpload";
+import { useStatusModal } from "../components/StatusModalProvider";
 
 export default function GangDashboard() {
   const router = useRouter();
+  const showStatus = useStatusModal();
   const [gangData, setGangData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "edit" | "welfare" | "upload_uniform" | "view_uniforms" | "leave" | "pause" | "disband">("overview");
   const [loading, setLoading] = useState(false);
@@ -107,7 +109,7 @@ export default function GangDashboard() {
   useEffect(() => {
     const savedGang = localStorage.getItem("currentGang");
     if (!savedGang) {
-      alert("🔒 กรุณาเข้าสู่ระบบก่อนใช้งานหน้า Dashboard");
+      showStatus({ type: "error", message: "🔒 กรุณาเข้าสู่ระบบก่อนใช้งานหน้า Dashboard" });
       router.push("/");
       return;
     }
@@ -125,7 +127,7 @@ export default function GangDashboard() {
     const approver = formData.get("approver") as string;
 
     if (!approver) {
-      alert("❌ กรุณาเลือกชื่อสภาที่อนุมัติ");
+      showStatus({ type: "error", message: "❌ กรุณาเลือกชื่อสภาที่อนุมัติ" });
       return;
     }
 
@@ -136,7 +138,7 @@ export default function GangDashboard() {
       const result = await requestDisbandGang(gangData.abbreviation, reason, approver);
       setLoading(false);
 
-      alert(result.message);
+      showStatus({ type: result.success ? "success" : "error", message: result.message });
       if (result.success) {
         const res = await getDisbandRequestByGang(gangData.id);
         if (res.success) setPendingDisband(res.request);
@@ -144,7 +146,7 @@ export default function GangDashboard() {
     } catch (error) {
       console.error(error);
       setLoading(false);
-      alert("❌ ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้ในขณะนี้");
+      showStatus({ type: "error", message: "❌ ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้ในขณะนี้" });
     }
   };
 
@@ -158,11 +160,11 @@ export default function GangDashboard() {
     const durationDays = Number(formData.get("durationDays"));
 
     if (!reason || !approver || !durationDays) {
-      alert("❌ กรุณากรอกเหตุผล เลือกสภา และระบุจำนวนวันพัก");
+      showStatus({ type: "error", message: "❌ กรุณากรอกเหตุผล เลือกสภา และระบุจำนวนวันพัก" });
       return;
     }
     if (durationDays < 1 || durationDays > 30) {
-      alert("❌ สามารถพักแก๊งได้สูงสุดไม่เกิน 30 วัน");
+      showStatus({ type: "error", message: "❌ สามารถพักแก๊งได้สูงสุดไม่เกิน 30 วัน" });
       return;
     }
 
@@ -173,7 +175,7 @@ export default function GangDashboard() {
       const result = await requestPauseGang(gangData.abbreviation, reason, approver, durationDays);
       setLoading(false);
 
-      alert(result.message);
+      showStatus({ type: result.success ? "success" : "error", message: result.message });
       if (result.success) {
         const res = await getPauseRequestByGang(gangData.id);
         if (res.success) setPendingPause(res.request);
@@ -181,7 +183,7 @@ export default function GangDashboard() {
     } catch (error) {
       console.error(error);
       setLoading(false);
-      alert("❌ ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้ในขณะนี้");
+      showStatus({ type: "error", message: "❌ ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้ในขณะนี้" });
     }
   };
 
@@ -306,7 +308,7 @@ export default function GangDashboard() {
     const formData = new FormData(e.currentTarget);
     const result = await createGangEditRequest(formData);
     setLoading(false);
-    alert(result.message);
+    showStatus({ type: result.success ? "success" : "error", message: result.message });
     if (result.success && result.editRequest) {
       setPendingEdit(result.editRequest);
       setColorTheme(result.editRequest.colorTheme || colorTheme);
@@ -391,12 +393,12 @@ export default function GangDashboard() {
     if (!gangData) return;
 
     if (!welfareForm.requesterName || !welfareForm.requesterDiscord || !welfareForm.requesterPhone) {
-      alert("❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรผู้ยื่นเรื่อง");
+      showStatus({ type: "error", message: "❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรผู้ยื่นเรื่อง" });
       return;
     }
 
     if (!welfareForm.approver) {
-      alert("❌ กรุณาเลือกชื่อสภาที่อนุมัติ");
+      showStatus({ type: "error", message: "❌ กรุณาเลือกชื่อสภาที่อนุมัติ" });
       return;
     }
 
@@ -407,16 +409,16 @@ export default function GangDashboard() {
     if (welfareSubTab === "receive") {
       requestType = "receive";
       if (!welfareForm.receiverName || !welfareForm.receiverDiscord || !welfareForm.receiverPhone) {
-        alert("❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรคนรับสวัสดิการ");
+        showStatus({ type: "error", message: "❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรคนรับสวัสดิการ" });
         return;
       }
       if (!welfareForm.welfareItemId) {
-        alert("❌ กรุณาเลือกประเภทสวัสดิการ");
+        showStatus({ type: "error", message: "❌ กรุณาเลือกประเภทสวัสดิการ" });
         return;
       }
       const selectedItem = welfareItems.find((i) => String(i.id) === welfareForm.welfareItemId);
       if (!selectedItem) {
-        alert("❌ ไม่พบรายการสวัสดิการที่เลือก");
+        showStatus({ type: "error", message: "❌ ไม่พบรายการสวัสดิการที่เลือก" });
         return;
       }
       details.receiverName = welfareForm.receiverName;
@@ -427,7 +429,7 @@ export default function GangDashboard() {
       details.category = selectedItem.type;
       if (selectedItem.type === "car") {
         if (!welfareForm.licensePlate) {
-          alert("❌ กรุณากรอกเลขทะเบียนรถ");
+          showStatus({ type: "error", message: "❌ กรุณากรอกเลขทะเบียนรถ" });
           return;
         }
         details.carType = welfareForm.carType;
@@ -446,7 +448,7 @@ export default function GangDashboard() {
         !welfareForm.tradeToDiscord ||
         !welfareForm.tradeToPhone
       ) {
-        alert("❌ กรุณากรอกข้อมูลผู้ถือสวัสดิการและผู้รับเทรดให้ครบ");
+        showStatus({ type: "error", message: "❌ กรุณากรอกข้อมูลผู้ถือสวัสดิการและผู้รับเทรดให้ครบ" });
         return;
       }
       details.tradeHolderName = welfareForm.tradeHolderName;
@@ -460,43 +462,48 @@ export default function GangDashboard() {
     }
 
     setLoading(true);
-    const result = await createWelfareRequest({
-      gangName: gangData.fullName,
-      gangAbbreviation: gangData.abbreviation,
-      requestName: welfareForm.requesterName,
-      discordId: welfareForm.requesterDiscord,
-      welfareItem,
-      requestType,
-      approver: welfareForm.approver,
-      details: JSON.stringify(details),
-    });
-    setLoading(false);
-
-    alert(result.message);
-    if (result.success) {
-      setWelfareForm((prev) => ({
-        ...prev,
-        requesterName: "",
-        requesterDiscord: "",
-        requesterPhone: "",
-        requesterRole: "Leader",
-        receiverName: "",
-        receiverDiscord: "",
-        receiverPhone: "",
-        welfareItemId: "",
-        welfareItemName: "",
-        category: "",
-        licensePlate: "",
-        tradeHolderName: "",
-        tradeHolderDiscord: "",
-        tradeHolderPhone: "",
-        tradeHolderWelfare: "",
-        tradeToName: "",
-        tradeToDiscord: "",
-        tradeToPhone: "",
-        approver: "",
-      }));
-      loadWelfareRequests(gangData.abbreviation);
+    try {
+      const result = await createWelfareRequest({
+        gangName: gangData.fullName,
+        gangAbbreviation: gangData.abbreviation,
+        requestName: welfareForm.requesterName,
+        discordId: welfareForm.requesterDiscord,
+        welfareItem,
+        requestType,
+        approver: welfareForm.approver,
+        details: JSON.stringify(details),
+      });
+      showStatus({ type: result.success ? "success" : "error", message: result.message });
+      if (result.success) {
+        setWelfareForm((prev) => ({
+          ...prev,
+          requesterName: "",
+          requesterDiscord: "",
+          requesterPhone: "",
+          requesterRole: "Leader",
+          receiverName: "",
+          receiverDiscord: "",
+          receiverPhone: "",
+          welfareItemId: "",
+          welfareItemName: "",
+          category: "",
+          licensePlate: "",
+          tradeHolderName: "",
+          tradeHolderDiscord: "",
+          tradeHolderPhone: "",
+          tradeHolderWelfare: "",
+          tradeToName: "",
+          tradeToDiscord: "",
+          tradeToPhone: "",
+          approver: "",
+        }));
+        loadWelfareRequests(gangData.abbreviation);
+      }
+    } catch (error) {
+      console.error("Error submitting welfare request:", error);
+      showStatus({ type: "error", message: "❌ ไม่สามารถเชื่อมต่อกับระบบได้ในขณะนี้" });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -506,15 +513,15 @@ export default function GangDashboard() {
     if (!gangData) return;
 
     if (!leaveForm.requesterName || !leaveForm.requesterDiscord || !leaveForm.requesterPhone) {
-      alert("❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรผู้ยื่นเรื่อง");
+      showStatus({ type: "error", message: "❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรผู้ยื่นเรื่อง" });
       return;
     }
     if (!leaveForm.leaveName || !leaveForm.leaveDiscord || !leaveForm.leavePhone) {
-      alert("❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรคนออก - ออกลอย");
+      showStatus({ type: "error", message: "❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรคนออก - ออกลอย" });
       return;
     }
     if (!leaveForm.approver) {
-      alert("❌ กรุณาเลือกชื่อสภาที่อนุมัติ");
+      showStatus({ type: "error", message: "❌ กรุณาเลือกชื่อสภาที่อนุมัติ" });
       return;
     }
 
@@ -533,7 +540,10 @@ export default function GangDashboard() {
     });
     setLoading(false);
 
-    alert(result.message);
+    showStatus({
+      type: result.success ? (result.hasWelfare ? "error" : "success") : "error",
+      message: result.message,
+    });
     if (result.success) {
       setLeaveForm({
         requesterName: "",
@@ -555,25 +565,25 @@ export default function GangDashboard() {
     if (!gangData) return;
 
     if (!uniformForm.approver || !uniformForm.fileUrl) {
-      alert("❌ กรุณากรอกข้อมูลให้ครบถ้วน");
+      showStatus({ type: "error", message: "❌ กรุณากรอกข้อมูลให้ครบถ้วน" });
       return;
     }
 
     const selectedPieces = pieceOptions.filter((p) => uniformForm.pieces[p]);
     if (selectedPieces.length === 0) {
-      alert("❌ กรุณาเลือกชิ้นส่วนชุด");
+      showStatus({ type: "error", message: "❌ กรุณาเลือกชิ้นส่วนชุด" });
       return;
     }
 
     if (isUniformActionNeedOld(uniformForm.actionType)) {
       if (!uniformForm.colorName || !uniformForm.hexColor) {
-        alert("❌ กรุณาใส่ Color และ Hex Color");
+        showStatus({ type: "error", message: "❌ กรุณาใส่ Color และ Hex Color" });
         return;
       }
     }
 
     if (isUniformActionNeedContract(uniformForm.actionType) && !uniformForm.contractUrl) {
-      alert("❌ กรุณาใส่ลิงก์ URL ใบสัญญาสภา (รูปภาพ)");
+      showStatus({ type: "error", message: "❌ กรุณาใส่ลิงก์ URL ใบสัญญาสภา (รูปภาพ)" });
       return;
     }
 
@@ -605,7 +615,7 @@ export default function GangDashboard() {
     });
     setLoading(false);
 
-    alert(result.message);
+    showStatus({ type: result.success ? "success" : "error", message: result.message });
     if (result.success) {
       setUniformForm(resetUniformForm());
       setActiveTab("view_uniforms");

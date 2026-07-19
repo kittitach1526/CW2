@@ -185,6 +185,19 @@ def init_db():
             status TEXT DEFAULT 'รอรับ',
             createdAt TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS system_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor TEXT,
+            actorRole TEXT,
+            action TEXT NOT NULL,
+            targetType TEXT,
+            targetId INTEGER,
+            targetName TEXT,
+            details TEXT,
+            description TEXT,
+            createdAt TEXT
+        );
         """
     )
 
@@ -230,6 +243,7 @@ def migrate_db(conn):
     add_column("welfare_items", "gang_limit", "INTEGER")
     add_column("welfare_items", "female_gang_limit", "INTEGER")
     add_column("welfare_items", "family_limit", "INTEGER")
+    add_column("system_logs", "description", "TEXT")
 
     # If an older schema made approverDiscord NOT NULL, normalize it so new forms can leave it empty
     try:

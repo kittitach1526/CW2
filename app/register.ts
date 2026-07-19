@@ -9,12 +9,30 @@ interface WelfareRequest {
   id: number;
   gangName?: string;
   gangAbbreviation?: string;
+  gangAbbr?: string;
   requestName: string;
   discordId: string;
   welfareItem: string;
+  requestType?: string;
   status: string;
   createdAt: string;
   approver?: string;
+  details?: any;
+  hasWelfare?: boolean;
+  activeWelfareItems?: any[];
+}
+
+interface SystemLog {
+  id: number;
+  actor?: string;
+  actorRole?: string;
+  action: string;
+  targetType?: string;
+  targetId?: number;
+  targetName?: string;
+  details?: any;
+  description?: string;
+  createdAt: string;
 }
 
 type ApiPayload = Record<string, unknown>;
@@ -114,8 +132,11 @@ export async function rejectPauseRequest(id: number, reviewer: string) {
   return apiFetch("POST", `/api/pause-requests/${id}/reject`, { reviewer });
 }
 
-export async function reportPauseRequest(id: number) {
-  return apiFetch("POST", `/api/pause-requests/${id}/report`);
+export async function reportPauseRequest(id: number, reporter?: string, actorRole?: string) {
+  const payload: ApiPayload = {};
+  if (reporter) payload.reporter = reporter;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("POST", `/api/pause-requests/${id}/report`, payload);
 }
 
 // ---------------------------------------------------------------------------
@@ -137,9 +158,14 @@ export async function getAllGangs() {
 
 export async function updateGangStatus(
   id: number,
-  status: "approved" | "disbanded" | "pending" | "รอยุบ" | "พัก"
+  status: "approved" | "disbanded" | "pending" | "รอยุบ" | "พัก",
+  actor?: string,
+  actorRole?: string
 ) {
-  return apiFetch("PATCH", `/api/gangs/${id}/status`, { status });
+  const payload: ApiPayload = { status };
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("PATCH", `/api/gangs/${id}/status`, payload);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,19 +222,26 @@ export async function getAllUniformFiles() {
 export async function updateUniformFileLink(
   id: number,
   newFileUrl: string,
-  reason: string
+  reason: string,
+  actor?: string,
+  actorRole?: string
 ) {
-  return apiFetch("PATCH", `/api/uniform-files/${id}/link`, {
-    newFileUrl,
-    reason,
-  });
+  const payload: ApiPayload = { newFileUrl, reason };
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("PATCH", `/api/uniform-files/${id}/link`, payload);
 }
 
 export async function updateUniformStatus(
   id: number,
-  status: "ลงแล้ว" | "ปฏิเสธ" | "รอลง"
+  status: "ลงแล้ว" | "ปฏิเสธ" | "รอลง",
+  actor?: string,
+  actorRole?: string
 ) {
-  return apiFetch("PATCH", `/api/uniform-files/${id}/status`, { status });
+  const payload: ApiPayload = { status };
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("PATCH", `/api/uniform-files/${id}/status`, payload);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,23 +279,50 @@ export async function getAllWelfareRequests() {
 
 export async function updateWelfareStatus(
   id: number,
-  status: "รับไปแล้ว" | "เอาออกแล้ว" | "เอาสวัสดิการออกแล้ว" | "รอรับ"
+  status: string,
+  actor?: string,
+  actorRole?: string
 ) {
-  return apiFetch("PATCH", `/api/welfare/${id}/status`, { status });
+  const payload: ApiPayload = { status };
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("PATCH", `/api/welfare/${id}/status`, payload);
+}
+
+export async function getLeaveRequests() {
+  const result = await apiFetch("GET", "/api/welfare/leave");
+  if (result.success && Array.isArray(result.requests)) {
+    result.requests = result.requests.map((req: WelfareRequest) => ({
+      ...req,
+      createdAt: formatThaiDate(req.createdAt),
+    }));
+  }
+  return result;
+}
+
+export async function getSystemLogs(limit = 500) {
+  return apiFetch("GET", `/api/logs?limit=${limit}`);
 }
 
 export async function getWelfareItems() {
   return apiFetch("GET", "/api/welfare-items");
 }
 
-export async function createWelfareItem(payload: {
-  name: string;
-  type: string;
-  gang_limit?: number | null;
-  female_gang_limit?: number | null;
-  family_limit?: number | null;
-}) {
-  return apiFetch("POST", "/api/welfare-items", payload);
+export async function createWelfareItem(
+  payload: {
+    name: string;
+    type: string;
+    gang_limit?: number | null;
+    female_gang_limit?: number | null;
+    family_limit?: number | null;
+  },
+  actor?: string,
+  actorRole?: string
+) {
+  const body: ApiPayload = { ...payload };
+  if (actor) body.actor = actor;
+  if (actorRole) body.actorRole = actorRole;
+  return apiFetch("POST", "/api/welfare-items", body);
 }
 
 export async function updateWelfareItem(
@@ -274,13 +334,21 @@ export async function updateWelfareItem(
     gang_limit?: number | null;
     female_gang_limit?: number | null;
     family_limit?: number | null;
-  }
+  },
+  actor?: string,
+  actorRole?: string
 ) {
-  return apiFetch("PATCH", `/api/welfare-items/${id}`, payload);
+  const body: ApiPayload = { ...payload };
+  if (actor) body.actor = actor;
+  if (actorRole) body.actorRole = actorRole;
+  return apiFetch("PATCH", `/api/welfare-items/${id}`, body);
 }
 
-export async function deleteWelfareItem(id: number) {
-  return apiFetch("DELETE", `/api/welfare-items/${id}`);
+export async function deleteWelfareItem(id: number, actor?: string, actorRole?: string) {
+  const payload: ApiPayload = {};
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("DELETE", `/api/welfare-items/${id}`, payload);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,13 +370,21 @@ export async function createCouncilUser(formData: FormData) {
 
 export async function updateCouncilUserStatus(
   id: number,
-  status: "อนุมัติ" | "ระงับใช้งาน"
+  status: "อนุมัติ" | "ระงับใช้งาน",
+  actor?: string,
+  actorRole?: string
 ) {
-  return apiFetch("PATCH", `/api/council/${id}/status`, { status });
+  const payload: ApiPayload = { status };
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("PATCH", `/api/council/${id}/status`, payload);
 }
 
-export async function deleteCouncilUser(id: number) {
-  return apiFetch("DELETE", `/api/council/${id}`);
+export async function deleteCouncilUser(id: number, actor?: string, actorRole?: string) {
+  const payload: ApiPayload = {};
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("DELETE", `/api/council/${id}`, payload);
 }
 
 // ---------------------------------------------------------------------------
@@ -330,13 +406,21 @@ export async function createAdminUser(formData: FormData) {
 
 export async function updateAdminUserStatus(
   id: number,
-  status: "อนุมัติ" | "ระงับใช้งาน"
+  status: "อนุมัติ" | "ระงับใช้งาน",
+  actor?: string,
+  actorRole?: string
 ) {
-  return apiFetch("PATCH", `/api/admin/${id}/status`, { status });
+  const payload: ApiPayload = { status };
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("PATCH", `/api/admin/${id}/status`, payload);
 }
 
-export async function deleteAdminUser(id: number) {
-  return apiFetch("DELETE", `/api/admin/${id}`);
+export async function deleteAdminUser(id: number, actor?: string, actorRole?: string) {
+  const payload: ApiPayload = {};
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("DELETE", `/api/admin/${id}`, payload);
 }
 
 // ---------------------------------------------------------------------------

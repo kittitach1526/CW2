@@ -7,6 +7,8 @@ import {
   updateUniformStatus,
   getAllGangs,
   getAllWelfareRequests,
+  getLeaveRequests,
+  getSystemLogs,
   updateGangStatus,
   updateWelfareStatus,
   getPendingGangEditRequests,
@@ -25,22 +27,28 @@ import {
   deleteWelfareItem,
 } from "../register";
 import Modal from "../components/Modal";
+import { useStatusModal } from "../components/StatusModalProvider";
 
 export default function CouncilAdminDashboard() {
   const router = useRouter();
+  const showStatus = useStatusModal();
   const [adminData, setAdminData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"approve_gang" | "approve_welfare" | "approve_uniform" | "approve_gang_edit" | "approve_disband" | "approve_pause" | "gang_list" | "welfare_by_gang" | "welfare_items">("approve_gang");
+  const currentActor = adminData?.name || adminData?.username || "สภากลาง";
+  const currentActorRole = adminData?.role || "council";
+  const [activeTab, setActiveTab] = useState<"approve_gang" | "approve_welfare" | "approve_leave" | "approve_uniform" | "approve_gang_edit" | "approve_disband" | "approve_pause" | "gang_list" | "welfare_by_gang" | "welfare_items" | "approve_logs">("approve_gang");
   const [loading, setLoading] = useState(false);
   const [selectedGangAbbr, setSelectedGangAbbr] = useState("");
   
   // Data States
   const [gangsList, setGangsList] = useState<any[]>([]);
   const [welfareRequests, setWelfareRequests] = useState<any[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
   const [uniformFiles, setUniformFiles] = useState<any[]>([]);
   const [editRequests, setEditRequests] = useState<any[]>([]);
   const [disbandRequests, setDisbandRequests] = useState<any[]>([]);
   const [pauseRequests, setPauseRequests] = useState<any[]>([]);
   const [welfareItems, setWelfareItems] = useState<any[]>([]);
+  const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [welfareItemName, setWelfareItemName] = useState("");
   const [welfareItemType, setWelfareItemType] = useState("");
   const [welfareItemGangLimit, setWelfareItemGangLimit] = useState("");
@@ -54,7 +62,7 @@ export default function CouncilAdminDashboard() {
   useEffect(() => {
     const savedAdmin = localStorage.getItem("currentCouncil");
     if (!savedAdmin) {
-      alert("🔒 กรุณาเข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่สภากลางก่อนใช้งาน");
+      showStatus({ type: "error", message: "🔒 กรุณาเข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่สภากลางก่อนใช้งาน" });
       router.push("/");
       return;
     }
@@ -83,6 +91,15 @@ export default function CouncilAdminDashboard() {
             setWelfareRequests(result.requests || []);
           } else {
             setWelfareRequests([]);
+          }
+        }
+
+        if (activeTab === "approve_leave") {
+          const result = await getLeaveRequests();
+          if (result.success) {
+            setLeaveRequests(result.requests || []);
+          } else {
+            setLeaveRequests([]);
           }
         }
 
@@ -131,6 +148,15 @@ export default function CouncilAdminDashboard() {
           }
         }
 
+        if (activeTab === "approve_logs") {
+          const result = await getSystemLogs();
+          if (result.success) {
+            setSystemLogs(result.logs || []);
+          } else {
+            setSystemLogs([]);
+          }
+        }
+
       } catch (error) {
         console.error("🚨 ระบบหลังบ้านขัดข้อง:", error);
       } finally {
@@ -151,17 +177,17 @@ export default function CouncilAdminDashboard() {
     if (confirm(`ยืนยันการเปลี่ยนสถานะกลุ่มเป็น [${status}] หรือไม่?`)) {
       try {
         setLoading(true);
-        const result = await updateGangStatus(id, status);
+        const result = await updateGangStatus(id, status, currentActor, currentActorRole);
         setLoading(false);
         if (result.success) {
-          alert(`✨ อัปเดตสถานะแก๊ง ID: #${id} เป็น [${status}] สำเร็จ!`);
+          showStatus({ type: "success", message: `✨ อัปเดตสถานะแก๊ง ID: #${id} เป็น [${status}] สำเร็จ!` });
           setGangsList((prev) => prev.map((g) => g.id === id ? { ...g, status: status } : g));
         } else {
-          alert(result.message);
+          showStatus({ type: result.success ? "success" : "error", message: result.message });
         }
       } catch (error) {
         setLoading(false);
-        alert("❌ เกิดข้อผิดพลาดในการอัปเดตสถานะแก๊ง");
+        showStatus({ type: "error", message: "❌ เกิดข้อผิดพลาดในการอัปเดตสถานะแก๊ง" });
       }
     }
   };
@@ -169,17 +195,34 @@ export default function CouncilAdminDashboard() {
   const handleApproveWelfare = async (id: number, status: "รับไปแล้ว" | "เอาออกแล้ว") => {
     try {
       setLoading(true);
-      const result = await updateWelfareStatus(id, status);
+      const result = await updateWelfareStatus(id, status, currentActor, currentActorRole);
       setLoading(false);
       if (result.success) {
-        alert(`✨ อัปเดตคำขอสวัสดิการ ID: #${id} เป็น [${status}] เรียบร้อย`);
+        showStatus({ type: "success", message: `✨ อัปเดตคำขอสวัสดิการ ID: #${id} เป็น [${status}] เรียบร้อย` });
         setWelfareRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: status } : r));
       } else {
-        alert(result.message);
+        showStatus({ type: result.success ? "success" : "error", message: result.message });
       }
     } catch (error) {
       setLoading(false);
-      alert("❌ เกิดข้อผิดพลาดในการอนุมัติสวัสดิการ");
+      showStatus({ type: "error", message: "❌ เกิดข้อผิดพลาดในการอนุมัติสวัสดิการ" });
+    }
+  };
+
+  const handleLeaveAction = async (id: number, status: string) => {
+    try {
+      setLoading(true);
+      const result = await updateWelfareStatus(id, status, currentActor, currentActorRole);
+      setLoading(false);
+      if (result.success) {
+        showStatus({ type: "success", message: result.message });
+        setLeaveRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: status } : r));
+      } else {
+        showStatus({ type: "error", message: result.message });
+      }
+    } catch (error) {
+      setLoading(false);
+      showStatus({ type: "error", message: "❌ เกิดข้อผิดพลาดในการอัปเดตคำขอออกลอย" });
     }
   };
 
@@ -188,14 +231,14 @@ export default function CouncilAdminDashboard() {
       const targetFile = uniformFiles.find((file) => file.id === id);
       if (!targetFile) return;
 
-      const res = await updateUniformStatus(id, status);
+      const res = await updateUniformStatus(id, status, currentActor, currentActorRole);
       
       if (res && res.success) {
-        alert(`✨ อัปเดตสถานะชุดโมเดล ID: #${id} ในฐานข้อมูลเรียบร้อย`);
+        showStatus({ type: "success", message: `✨ อัปเดตสถานะชุดโมเดล ID: #${id} ในฐานข้อมูลเรียบร้อย` });
         setUniformFiles((prev) => prev.map((f) => f.id === id ? { ...f, status: status } : f));
       }
     } catch (error) {
-      alert("❌ เกิดข้อผิดพลาดในการอัปเดตข้อมูลชุด");
+      showStatus({ type: "error", message: "❌ เกิดข้อผิดพลาดในการอัปเดตข้อมูลชุด" });
     }
   };
 
@@ -211,7 +254,7 @@ export default function CouncilAdminDashboard() {
   const handleSaveWelfareItem = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!welfareItemName.trim() || !welfareItemType.trim()) {
-      alert("❌ กรุณากรอกชื่อและประเภทสวัสดิการ");
+      showStatus({ type: "error", message: "❌ กรุณากรอกชื่อและประเภทสวัสดิการ" });
       return;
     }
     setLoading(true);
@@ -228,20 +271,20 @@ export default function CouncilAdminDashboard() {
         family_limit: parseLimit(welfareItemFamilyLimit),
       };
       const result = editingWelfareItemId
-        ? await updateWelfareItem(editingWelfareItemId, payload)
-        : await createWelfareItem(payload);
+        ? await updateWelfareItem(editingWelfareItemId, payload, currentActor, currentActorRole)
+        : await createWelfareItem(payload, currentActor, currentActorRole);
       setLoading(false);
       if (result.success) {
-        alert(result.message);
+        showStatus({ type: result.success ? "success" : "error", message: result.message });
         resetWelfareItemForm();
         const refresh = await getWelfareItems();
         if (refresh.success) setWelfareItems(refresh.items || []);
       } else {
-        alert(result.message);
+        showStatus({ type: result.success ? "success" : "error", message: result.message });
       }
     } catch (error) {
       setLoading(false);
-      alert("❌ เกิดข้อผิดพลาดในการบันทึกรายการสวัสดิการ");
+      showStatus({ type: "error", message: "❌ เกิดข้อผิดพลาดในการบันทึกรายการสวัสดิการ" });
     }
   };
 
@@ -258,18 +301,18 @@ export default function CouncilAdminDashboard() {
     if (!confirm("ยืนยันการลบรายการสวัสดิการนี้หรือไม่?")) return;
     setLoading(true);
     try {
-      const result = await deleteWelfareItem(id);
+      const result = await deleteWelfareItem(id, currentActor, currentActorRole);
       setLoading(false);
       if (result.success) {
-        alert(result.message);
+        showStatus({ type: result.success ? "success" : "error", message: result.message });
         const refresh = await getWelfareItems();
         if (refresh.success) setWelfareItems(refresh.items || []);
       } else {
-        alert(result.message);
+        showStatus({ type: result.success ? "success" : "error", message: result.message });
       }
     } catch (error) {
       setLoading(false);
-      alert("❌ เกิดข้อผิดพลาดในการลบรายการสวัสดิการ");
+      showStatus({ type: "error", message: "❌ เกิดข้อผิดพลาดในการลบรายการสวัสดิการ" });
     }
   };
 
@@ -280,10 +323,10 @@ export default function CouncilAdminDashboard() {
       : await rejectGangEditRequest(id, reviewer);
 
     if (result.success) {
-      alert(result.message);
+      showStatus({ type: result.success ? "success" : "error", message: result.message });
       setEditRequests((prev) => prev.filter((r) => r.id !== id));
     } else {
-      alert(result.message);
+      showStatus({ type: result.success ? "success" : "error", message: result.message });
     }
   };
 
@@ -294,10 +337,10 @@ export default function CouncilAdminDashboard() {
       : await rejectDisbandRequest(id, reviewer);
 
     if (result.success) {
-      alert(result.message);
+      showStatus({ type: result.success ? "success" : "error", message: result.message });
       setDisbandRequests((prev) => prev.filter((r) => r.id !== id));
     } else {
-      alert(result.message);
+      showStatus({ type: result.success ? "success" : "error", message: result.message });
     }
   };
 
@@ -309,14 +352,14 @@ export default function CouncilAdminDashboard() {
     } else if (action === "reject") {
       result = await rejectPauseRequest(id, reviewer);
     } else {
-      result = await reportPauseRequest(id);
+      result = await reportPauseRequest(id, currentActor, currentActorRole);
     }
 
     if (result.success) {
-      alert(result.message);
+      showStatus({ type: result.success ? "success" : "error", message: result.message });
       setPauseRequests((prev) => prev.filter((r) => r.id !== id));
     } else {
-      alert(result.message);
+      showStatus({ type: result.success ? "success" : "error", message: result.message });
     }
   };
 
@@ -381,10 +424,12 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
     { id: "approve_disband", label: "อนุมัติยุบแก๊ง", icon: "⚠️" },
     { id: "approve_pause", label: "อนุมัติพักแก๊ง", icon: "⏸️" },
     { id: "approve_welfare", label: "แจกสวัสดิการ", icon: "🎁" },
+    { id: "approve_leave", label: "ออกลอย", icon: "🚪" },
     { id: "approve_uniform", label: "จัดการไฟล์ชุด", icon: "👕" },
     { id: "gang_list", label: "รายชื่อแก๊งทั้งหมด", icon: "📋" },
     { id: "welfare_by_gang", label: "สวัสดิการตามแก๊ง", icon: "🎁" },
     { id: "welfare_items", label: "จัดการรายการสวัสดิการ", icon: "📦" },
+    { id: "approve_logs", label: "Logs", icon: "📝" },
   ] as const;
 
   const pendingGangCount = gangsList.filter((g) => g.status === "pending" || g.status === "รอยุบ").length;
@@ -769,6 +814,83 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                 </div>
               )}
 
+              {/* MENU 5: คำขอออกลอย */}
+              {activeTab === "approve_leave" && (
+                <div className="flex flex-col w-full">
+                  <div className="p-5 border-b border-white/[0.06] bg-white/[0.01]">
+                    <h2 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">🚪 คำขอออก - ออกลอย</h2>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left whitespace-nowrap">
+                      <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06]">
+                        <tr>
+                          <th className="px-6 py-4">แก๊ง</th>
+                          <th className="px-6 py-4">ผู้ยื่นเรื่อง</th>
+                          <th className="px-6 py-4">คนออก</th>
+                          <th className="px-6 py-4">สวัสดิการค้าง</th>
+                          <th className="px-6 py-4">สถานะ</th>
+                          <th className="px-6 py-4 text-center">การดำเนินการ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.04] text-zinc-300">
+                        {leaveRequests.length === 0 ? (
+                          <tr><td colSpan={6} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีคำขอออกลอย</td></tr>
+                        ) : (
+                          leaveRequests.map((req) => {
+                            const details = parseDetails(req.details);
+                            return (
+                              <tr key={req.id} className="hover:bg-white/[0.01] transition-colors">
+                                <td className="px-6 py-4 font-semibold text-white">{req.gangName} <span className="text-zinc-500">[{req.gangAbbreviation || req.gangAbbr}]</span></td>
+                                <td className="px-6 py-4">
+                                  <span className="block text-zinc-300 font-medium">{req.requestName}</span>
+                                  <span className="text-[10px] text-zinc-500 font-mono">{req.discordId}</span>
+                                  {details.requesterPhone && <span className="text-[10px] text-zinc-400 block">📞 {details.requesterPhone}</span>}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="block text-zinc-300 font-medium">{details.leaveName || "-"}</span>
+                                  <span className="text-[10px] text-zinc-500 font-mono">{details.leaveDiscord || "-"}</span>
+                                  {details.leavePhone && <span className="text-[10px] text-zinc-400 block">📞 {details.leavePhone}</span>}
+                                </td>
+                                <td className="px-6 py-4">
+                                  {req.hasWelfare ? (
+                                    <span className="text-rose-400 font-medium">
+                                      {req.activeWelfareItems?.map((i: any) => i.welfareItem).join(", ")}
+                                    </span>
+                                  ) : (
+                                    <span className="text-zinc-500">-</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${req.status === "เอาสวัสดิการออกแล้ว" ? "bg-white/[0.08] text-white border-white/[0.1]" : "bg-white/[0.01] text-zinc-500 border-white/[0.04]"}`}>
+                                    {req.status === "เอาสวัสดิการออกแล้ว" ? "✓ เอาสวัสดิการออกแล้ว" : "⏳ รอดำเนินการ"}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                  {req.status === "รอรับ" ? (
+                                    req.hasWelfare ? (
+                                      <span className="text-[10px] text-rose-400 font-medium">ต้องเอาสวัสดิการออก</span>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleLeaveAction(req.id, "เอาสวัสดิการออกแล้ว")}
+                                        className="px-4 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg transition-all text-[11px]"
+                                      >
+                                        เอาสวัสดิการออกแล้ว
+                                      </button>
+                                    )
+                                  ) : (
+                                    <span className="text-zinc-500 text-xs">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* MENU 3: ยืนยันชุด */}
               {activeTab === "approve_uniform" && (
                 <div className="flex flex-col w-full">
@@ -1085,7 +1207,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                             type="button"
                             onClick={() => {
                               if (!newTypeInput.trim()) {
-                                alert("❌ กรุณากรอกชื่อประเภท");
+                                showStatus({ type: "error", message: "❌ กรุณากรอกชื่อประเภท" });
                                 return;
                               }
                               setWelfareItemType(newTypeInput.trim());
@@ -1151,6 +1273,50 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* MENU 10: Logs */}
+              {activeTab === "approve_logs" && (
+                <div className="flex flex-col w-full">
+                  <div className="p-5 border-b border-white/[0.06] bg-white/[0.01] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <h2 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">📝 Logs การกระทำ</h2>
+                    <span className="text-xs text-zinc-500">แสดง {systemLogs.length} รายการ</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06]">
+                        <tr>
+                          <th className="px-6 py-4 w-40">เวลา</th>
+                          <th className="px-6 py-4 w-40">ผู้กระทำ</th>
+                          <th className="px-6 py-4">รายละเอียดการกระทำ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.04] text-zinc-300">
+                        {systemLogs.length === 0 ? (
+                          <tr><td colSpan={3} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มี log ในระบบ</td></tr>
+                        ) : (
+                          systemLogs.map((log) => (
+                            <tr key={log.id} className="hover:bg-white/[0.01] transition-colors">
+                              <td className="px-6 py-4 text-zinc-400 align-top">{new Date(log.createdAt).toLocaleString("th-TH")}</td>
+                              <td className="px-6 py-4 align-top">
+                                <div className="font-medium text-white">{log.actor || "-"}</div>
+                                <div className="text-[10px] text-zinc-500 mt-0.5">{log.actorRole || "-"}</div>
+                              </td>
+                              <td className="px-6 py-4 text-zinc-300 align-top" title={log.details ? JSON.stringify(log.details) : ""}>
+                                {log.description || `${log.action} ${log.targetType || ""} ${log.targetId ? `#${log.targetId}` : ""}`.trim()}
+                                {log.details && (
+                                  <div className="text-[10px] text-zinc-500 mt-1 font-mono truncate max-w-xl">
+                                    {JSON.stringify(log.details)}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
