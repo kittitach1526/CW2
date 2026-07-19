@@ -816,6 +816,40 @@ def create_welfare_request():
 
     db = get_db()
     try:
+        request_type = (data.get("requestType") or "receive").strip()
+        gang_abbreviation = data.get("gangAbbreviation") or ""
+        welfare_item = data["welfareItem"].strip()
+
+        if request_type == "receive":
+            item = db.execute(
+                "SELECT * FROM welfare_items WHERE name = ? AND active = 1", (welfare_item,)
+            ).fetchone()
+            gang = db.execute(
+                "SELECT type FROM gangs WHERE abbreviation = ?", (gang_abbreviation,)
+            ).fetchone() if gang_abbreviation else None
+            if item and gang:
+                limit_column = {
+                    "Gang": "gang_limit",
+                    "Gangs-LD": "female_gang_limit",
+                    "Family": "family_limit",
+                }.get(gang["type"])
+                if limit_column:
+                    limit = item[limit_column]
+                    if limit is not None:
+                        current = db.execute(
+                            """
+                            SELECT COUNT(*) FROM welfare_requests
+                            WHERE gangAbbreviation = ? AND welfareItem = ? AND requestType = 'receive'
+                            AND status NOT IN ('เอาออกแล้ว', 'เอาสวัสดิการออกแล้ว')
+                            """,
+                            (gang_abbreviation, welfare_item),
+                        ).fetchone()[0]
+                        if current >= limit:
+                            return jsonify({
+                                "success": False,
+                                "message": f"❌ แก๊งประเภท {gang['type']} ครอบครอง {welfare_item} ได้ไม่เกิน {limit} อัน"
+                            }), 409
+
         db.execute(
             """
             INSERT INTO welfare_requests
@@ -824,11 +858,11 @@ def create_welfare_request():
             """,
             (
                 data.get("gangName") or None,
-                data.get("gangAbbreviation") or None,
+                gang_abbreviation or None,
                 data["requestName"].strip(),
                 data["discordId"].strip(),
-                data["welfareItem"].strip(),
-                (data.get("requestType") or "receive").strip(),
+                welfare_item,
+                request_type,
                 data.get("approver") or None,
                 now_thai(),
                 json.dumps(details, ensure_ascii=False) if details else None,
@@ -880,11 +914,12 @@ def update_welfare_status(id):
     try:
         db.execute("UPDATE welfare_requests SET status = ? WHERE id = ?", (status, id))
         db.commit()
-        msg = (
-            "✅ อนุมัติการแจกจ่ายพัสดุและทำเครื่องหมายส่งมอบแล้ว"
-            if status == "รับไปแล้ว"
-            else "❌ ยกเลิก/นำคำขอสวัสดิการนี้ออกจากระบบแล้ว"
-        )
+        if status == "รับไปแล้ว":
+            msg = "✅ อนุมัติการแจกจ่ายพัสดุและทำเครื่องหมายส่งมอบแล้ว"
+        elif status == "เอาสวัสดิการออกแล้ว":
+            msg = "✅ อัปเดตสถานะเป็นเอาสวัสดิการออกแล้ว"
+        else:
+            msg = "❌ ยกเลิก/นำคำขอสวัสดิการนี้ออกจากระบบแล้ว"
         return jsonify({"success": True, "message": msg})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตสถานะสวัสดิการได้"}), 500
@@ -907,6 +942,15 @@ def get_welfare_items():
         db.close()
 
 
+def parse_optional_int(value):
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+
 @app.route("/api/welfare-items", methods=["POST"])
 def create_welfare_item():
     data = request.get_json(silent=True) or {}
@@ -914,11 +958,14 @@ def create_welfare_item():
     item_type = (data.get("type") or "").strip()
     if not name or not item_type:
         return jsonify({"success": False, "message": "❌ กรุณากรอกชื่อและประเภทสวัสดิการ"}), 400
+    gang_limit = parse_optional_int(data.get("gang_limit"))
+    female_gang_limit = parse_optional_int(data.get("female_gang_limit"))
+    family_limit = parse_optional_int(data.get("family_limit"))
     db = get_db()
     try:
         db.execute(
-            "INSERT INTO welfare_items (name, type, active, createdAt) VALUES (?, ?, 1, ?)",
-            (name, item_type, now_thai()),
+            "INSERT INTO welfare_items (name, type, gang_limit, female_gang_limit, family_limit, active, createdAt) VALUES (?, ?, ?, ?, ?, 1, ?)",
+            (name, item_type, gang_limit, female_gang_limit, family_limit, now_thai()),
         )
         db.commit()
         return jsonify({"success": True, "message": "✅ เพิ่มรายการสวัสดิการสำเร็จ"})
@@ -936,7 +983,8 @@ def update_welfare_item(item_id):
     name = (data.get("name") or "").strip()
     item_type = (data.get("type") or "").strip()
     active = data.get("active")
-    if not name and not item_type and active is None:
+    has_limit_update = any(k in data for k in ["gang_limit", "female_gang_limit", "family_limit"])
+    if not name and not item_type and active is None and not has_limit_update:
         return jsonify({"success": False, "message": "❌ ไม่มีข้อมูลที่ต้องการแก้ไข"}), 400
     updates = []
     params = []
@@ -949,6 +997,15 @@ def update_welfare_item(item_id):
     if active is not None:
         updates.append("active = ?")
         params.append(1 if active else 0)
+    if "gang_limit" in data:
+        updates.append("gang_limit = ?")
+        params.append(parse_optional_int(data.get("gang_limit")))
+    if "female_gang_limit" in data:
+        updates.append("female_gang_limit = ?")
+        params.append(parse_optional_int(data.get("female_gang_limit")))
+    if "family_limit" in data:
+        updates.append("family_limit = ?")
+        params.append(parse_optional_int(data.get("family_limit")))
     params.append(item_id)
     db = get_db()
     try:
@@ -1330,24 +1387,105 @@ def set_welfare_season_weapons(season_id):
         for w in weapons:
             t = (w.get("type") or "").strip()
             name = (w.get("weapon") or "").strip()
+            quantity = w.get("quantity")
+            try:
+                quantity = int(quantity) if quantity is not None else 1
+            except (TypeError, ValueError):
+                quantity = 1
             if not t or not name:
                 continue
             key = (t, name)
             if key in seen:
                 continue
             seen.add(key)
-            inserts.append((t, name))
+            inserts.append((t, name, quantity))
         # Replace all weapons for this season
         db.execute("DELETE FROM welfare_season_weapons WHERE seasonId = ?", (season_id,))
-        for t, name in inserts:
+        for t, name, quantity in inserts:
             db.execute(
-                "INSERT INTO welfare_season_weapons (seasonId, type, weapon) VALUES (?, ?, ?)",
-                (season_id, t, name),
+                "INSERT INTO welfare_season_weapons (seasonId, type, weapon, quantity) VALUES (?, ?, ?, ?)",
+                (season_id, t, name, quantity),
             )
         db.commit()
         return jsonify({"success": True, "message": "✅ บันทึกรายการอาวุธสำเร็จ"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถบันทึกอาวุธได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare-remaining/<gang_abbreviation>", methods=["GET"])
+def get_welfare_remaining(gang_abbreviation):
+    db = get_db()
+    try:
+        gang = db.execute("SELECT * FROM gangs WHERE abbreviation = ?", (gang_abbreviation,)).fetchone()
+        if not gang:
+            return jsonify({"success": False, "message": "❌ ไม่พบแก๊ง"}), 404
+        gang = row_to_dict(gang)
+        gang_type = gang.get("type") or "Gang"
+
+        # Find active season(s) that apply to this gang type
+        # For now support regular active season; event seasons match allowedTypes too
+        season_rows = db.execute(
+            "SELECT * FROM welfare_seasons WHERE active = 1 ORDER BY kind ASC, id DESC"
+        ).fetchall()
+        active_season_id = None
+        active_season_name = None
+        for s in season_rows:
+            if s["kind"] == "regular" and (not s["allowedTypes"] or gang_type in json.loads(s["allowedTypes"] or "[]")):
+                active_season_id = s["id"]
+                active_season_name = s["name"]
+                break
+            if s["kind"] == "event":
+                allowed = json.loads(s["allowedTypes"] or "[]")
+                selected = json.loads(s["selectedGangs"] or "[]")
+                if (not allowed or gang_type in allowed) and (s["gangSelection"] == "all" or gang_abbreviation in selected):
+                    active_season_id = s["id"]
+                    active_season_name = s["name"]
+                    break
+
+        if not active_season_id:
+            return jsonify({"success": True, "season": None, "weapons": []})
+
+        weapons = db.execute(
+            "SELECT weapon, type, quantity FROM welfare_season_weapons WHERE seasonId = ? AND type = ? ORDER BY weapon ASC",
+            (active_season_id, gang_type),
+        ).fetchall()
+
+        all_requests = db.execute(
+            "SELECT status, details FROM welfare_requests WHERE gangAbbreviation = ? AND requestType = 'receive' AND welfareItem = ?",
+            (gang_abbreviation, "สวัสดิการอาวุธ"),
+        ).fetchall()
+
+        result = []
+        for w in weapons:
+            name = w["weapon"]
+            limit = w["quantity"]
+            used = 0
+            for req in all_requests:
+                if req["status"] in ("เอาออกแล้ว", "เอาสวัสดิการออกแล้ว"):
+                    continue
+                details = req["details"]
+                if isinstance(details, str):
+                    try:
+                        details = json.loads(details)
+                    except Exception:
+                        details = {}
+                if not isinstance(details, dict):
+                    details = {}
+                if details.get("category") == "weapon" and details.get("weaponType") == name:
+                    used += 1
+            remaining = None if limit is None or limit <= 0 else max(0, limit - used)
+            result.append({
+                "weapon": name,
+                "limit": limit,
+                "used": used,
+                "remaining": remaining,
+            })
+
+        return jsonify({"success": True, "season": active_season_name, "weapons": result})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถดึงข้อมูลคงเหลือได้"}), 500
     finally:
         db.close()
 

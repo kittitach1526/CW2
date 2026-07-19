@@ -246,7 +246,7 @@ export async function getAllWelfareRequests() {
 
 export async function updateWelfareStatus(
   id: number,
-  status: "รับไปแล้ว" | "เอาออกแล้ว" | "รอรับ"
+  status: "รับไปแล้ว" | "เอาออกแล้ว" | "เอาสวัสดิการออกแล้ว" | "รอรับ"
 ) {
   return apiFetch("PATCH", `/api/welfare/${id}/status`, { status });
 }
@@ -255,48 +255,32 @@ export async function getWelfareItems() {
   return apiFetch("GET", "/api/welfare-items");
 }
 
-export async function createWelfareItem(name: string, type: string) {
-  return apiFetch("POST", "/api/welfare-items", { name, type });
+export async function createWelfareItem(payload: {
+  name: string;
+  type: string;
+  gang_limit?: number | null;
+  female_gang_limit?: number | null;
+  family_limit?: number | null;
+}) {
+  return apiFetch("POST", "/api/welfare-items", payload);
 }
 
 export async function updateWelfareItem(
   id: number,
-  payload: { name?: string; type?: string; active?: boolean }
+  payload: {
+    name?: string;
+    type?: string;
+    active?: boolean;
+    gang_limit?: number | null;
+    female_gang_limit?: number | null;
+    family_limit?: number | null;
+  }
 ) {
   return apiFetch("PATCH", `/api/welfare-items/${id}`, payload);
 }
 
 export async function deleteWelfareItem(id: number) {
   return apiFetch("DELETE", `/api/welfare-items/${id}`);
-}
-
-// ---------------------------------------------------------------------------
-// Welfare Season Management
-// ---------------------------------------------------------------------------
-export async function getWelfareSeasons() {
-  return apiFetch("GET", "/api/welfare-seasons");
-}
-
-export async function createWelfareSeason(payload: Record<string, unknown>) {
-  return apiFetch("POST", "/api/welfare-seasons", payload);
-}
-
-export async function updateWelfareSeason(
-  id: number,
-  payload: Record<string, unknown>
-) {
-  return apiFetch("PATCH", `/api/welfare-seasons/${id}`, payload);
-}
-
-export async function deleteWelfareSeason(id: number) {
-  return apiFetch("DELETE", `/api/welfare-seasons/${id}`);
-}
-
-export async function setWelfareSeasonWeapons(
-  id: number,
-  weapons: { type: string; weapon: string }[]
-) {
-  return apiFetch("POST", `/api/welfare-seasons/${id}/weapons`, { weapons });
 }
 
 // ---------------------------------------------------------------------------

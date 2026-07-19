@@ -139,6 +139,9 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
             type TEXT NOT NULL,
+            gang_limit INTEGER,
+            female_gang_limit INTEGER,
+            family_limit INTEGER,
             active INTEGER DEFAULT 1,
             createdAt TEXT
         );
@@ -161,6 +164,7 @@ def init_db():
             seasonId INTEGER NOT NULL,
             type TEXT NOT NULL,
             weapon TEXT NOT NULL,
+            quantity INTEGER DEFAULT 1,
             FOREIGN KEY (seasonId) REFERENCES welfare_seasons(id) ON DELETE CASCADE
         );
 
@@ -222,6 +226,10 @@ def migrate_db(conn):
     add_column("gang_edit_requests", "coLeader2Phone", "TEXT")
     add_column("gang_edit_requests", "approver", "TEXT")
     add_column("gang_edit_requests", "logoUrl", "TEXT")
+    add_column("welfare_season_weapons", "quantity", "INTEGER DEFAULT 1")
+    add_column("welfare_items", "gang_limit", "INTEGER")
+    add_column("welfare_items", "female_gang_limit", "INTEGER")
+    add_column("welfare_items", "family_limit", "INTEGER")
 
     # If an older schema made approverDiscord NOT NULL, normalize it so new forms can leave it empty
     try:

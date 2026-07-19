@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -41,31 +41,53 @@ type UniformFile = {
   createdAt: string;
 };
 
-function getInitialAdminData(): AdminData | null {
-  if (typeof window === "undefined") return null;
-  const saved = localStorage.getItem("currentAdmin");
-  if (!saved) return null;
-  try {
-    return JSON.parse(saved) as AdminData;
-  } catch {
-    return null;
-  }
-}
-
 export default function AdminDashboard() {
   const router = useRouter();
-  const [adminData] = useState<AdminData | null>(getInitialAdminData);
+  const [adminData, setAdminData] = useState<AdminData | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<"welfare" | "outfit">("welfare");
   const [loading, setLoading] = useState(false);
   const [welfareRequests, setWelfareRequests] = useState<WelfareRequest[]>([]);
   const [uniformFiles, setUniformFiles] = useState<UniformFile[]>([]);
+  const [selectedGang, setSelectedGang] = useState<string>("ทั้งหมด");
+  const [selectedOutfitGang, setSelectedOutfitGang] = useState<string>("ทั้งหมด");
+
+  const filteredWelfareRequests = useMemo(() => {
+    if (selectedGang === "ทั้งหมด") return welfareRequests;
+    return welfareRequests.filter((r) => r.gangAbbreviation === selectedGang);
+  }, [welfareRequests, selectedGang]);
+
+  const gangOptions = useMemo(() => {
+    return ["ทั้งหมด", ...Array.from(new Set(welfareRequests.map((r) => r.gangAbbreviation).filter(Boolean)))];
+  }, [welfareRequests]);
+
+  const filteredUniformFiles = useMemo(() => {
+    if (selectedOutfitGang === "ทั้งหมด") return uniformFiles;
+    return uniformFiles.filter((f) => f.gangName === selectedOutfitGang);
+  }, [uniformFiles, selectedOutfitGang]);
+
+  const outfitGangOptions = useMemo(() => {
+    return ["ทั้งหมด", ...Array.from(new Set(uniformFiles.map((f) => f.gangName).filter(Boolean)))];
+  }, [uniformFiles]);
 
   useEffect(() => {
-    if (!adminData) {
+    setMounted(true);
+    const saved = localStorage.getItem("currentAdmin");
+    if (saved) {
+      try {
+        setAdminData(JSON.parse(saved) as AdminData);
+      } catch {
+        setAdminData(null);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !adminData) {
       alert("🔒 กรุณาเข้าสู่ระบบด้วยบัญชีผู้ดูแลระบบก่อน");
       router.push("/admin-login");
     }
-  }, [adminData, router]);
+  }, [mounted, adminData, router]);
 
   useEffect(() => {
     if (!adminData) return;
@@ -110,7 +132,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleWelfareAction = async (id: number, status: "รับไปแล้ว" | "เอาออกแล้ว") => {
+  const handleWelfareAction = async (id: number, status: "รับไปแล้ว" | "เอาออกแล้ว" | "เอาสวัสดิการออกแล้ว") => {
     try {
       const result = await updateWelfareStatus(id, status);
       if (result.success) {
@@ -144,7 +166,7 @@ export default function AdminDashboard() {
     }
   };
 
-  if (!adminData) {
+  if (!mounted || !adminData) {
     return (
       <div className="text-zinc-500 text-center mt-20 font-light tracking-widest animate-pulse">
         🔒 กำลังตรวจสอบสิทธิ์ผู้ดูแลระบบ...
@@ -240,6 +262,21 @@ export default function AdminDashboard() {
 
           {!loading && activeTab === "welfare" && (
             <div className="overflow-x-auto">
+              <div className="flex flex-col sm:flex-row gap-4 p-4 border-b border-white/10 bg-white/5">
+                <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                  <span>กรองตามแก๊ง</span>
+                  <select
+                    value={selectedGang}
+                    onChange={(e) => setSelectedGang(e.target.value)}
+                    className="h-10 px-3 rounded-xl bg-zinc-950 border border-white/10 text-zinc-200 text-sm focus:outline-none focus:border-blue-400"
+                  >
+                    {gangOptions.map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </label>
+                <span className="text-xs text-zinc-500 flex items-center">แสดง {filteredWelfareRequests.length} รายการ</span>
+              </div>
               <table className="w-full text-xs text-left whitespace-nowrap">
                 <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/10 font-medium">
                   <tr>
@@ -251,14 +288,14 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10 text-zinc-300">
-                  {welfareRequests.length === 0 ? (
+                  {filteredWelfareRequests.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="text-center py-20 text-zinc-500 font-light tracking-wide">
                         📭 ไม่มีคำขอสวัสดิการในระบบ
                       </td>
                     </tr>
                   ) : (
-                    welfareRequests.map((req) => (
+                    filteredWelfareRequests.map((req) => (
                       <tr key={req.id} className="hover:bg-white/5 transition-colors">
                         <td className="px-6 py-4 font-semibold text-white">
                           {req.gangName}{" "}
@@ -275,7 +312,7 @@ export default function AdminDashboard() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center">
-                          {req.status !== "รับไปแล้ว" && req.status !== "เอาออกแล้ว" ? (
+                          {req.status === "รอรับ" ? (
                             <div className="flex justify-center gap-2">
                               <button
                                 onClick={() => handleWelfareAction(req.id, "รับไปแล้ว")}
@@ -290,9 +327,18 @@ export default function AdminDashboard() {
                                 ยกเลิก
                               </button>
                             </div>
+                          ) : req.status === "รับไปแล้ว" ? (
+                            <div className="flex justify-center gap-2">
+                              <button
+                                onClick={() => handleWelfareAction(req.id, "เอาสวัสดิการออกแล้ว")}
+                                className="px-4 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg transition-all text-[11px]"
+                              >
+                                เอาสวัสดิการออกแล้ว
+                              </button>
+                            </div>
                           ) : (
                             <span className="text-[10px] font-medium px-2.5 py-1 rounded-md border bg-white/5 text-zinc-300 border-white/10">
-                              {req.status === "รับไปแล้ว" ? "✓ ส่งมอบแล้ว" : "✕ ยกเลิกคำขอ"}
+                              {req.status === "เอาสวัสดิการออกแล้ว" ? "✕ เอาสวัสดิการออกแล้ว" : "✕ ยกเลิกคำขอ"}
                             </span>
                           )}
                         </td>
@@ -306,6 +352,21 @@ export default function AdminDashboard() {
 
           {!loading && activeTab === "outfit" && (
             <div className="overflow-x-auto">
+              <div className="flex flex-col sm:flex-row gap-4 p-4 border-b border-white/10 bg-white/5">
+                <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                  <span>กรองตามแก๊ง</span>
+                  <select
+                    value={selectedOutfitGang}
+                    onChange={(e) => setSelectedOutfitGang(e.target.value)}
+                    className="h-10 px-3 rounded-xl bg-zinc-950 border border-white/10 text-zinc-200 text-sm focus:outline-none focus:border-purple-400"
+                  >
+                    {outfitGangOptions.map((g) => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                </label>
+                <span className="text-xs text-zinc-500 flex items-center">แสดง {filteredUniformFiles.length} รายการ</span>
+              </div>
               <table className="w-full text-xs text-left whitespace-nowrap">
                 <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/10 font-medium">
                   <tr>
@@ -318,14 +379,14 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10 text-zinc-300">
-                  {uniformFiles.length === 0 ? (
+                  {filteredUniformFiles.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="text-center py-20 text-zinc-500 font-light tracking-wide">
                         📭 ไม่มีไฟล์ชุดในระบบ
                       </td>
                     </tr>
                   ) : (
-                    uniformFiles.map((file) => (
+                    filteredUniformFiles.map((file) => (
                       <tr key={file.id} className="hover:bg-white/5 transition-colors">
                         <td className="px-6 py-4 font-semibold text-white">{file.gangName}</td>
                         <td className="px-6 py-4 text-zinc-400">{file.uniformType}</td>

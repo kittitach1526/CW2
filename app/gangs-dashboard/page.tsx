@@ -1,7 +1,7 @@
 // app/dashboard/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -36,7 +36,7 @@ export default function GangDashboard() {
   const [councilNames, setCouncilNames] = useState<string[]>([]);
 
   // รายการสวัสดิการจากฐานข้อมูล
-  const [welfareItems, setWelfareItems] = useState<{ id: number; name: string; type: string }[]>([]);
+  const [welfareItems, setWelfareItems] = useState<{ id: number; name: string; type: string; gang_limit?: number | null; female_gang_limit?: number | null; family_limit?: number | null }[]>([]);
 
   const loadWelfareItems = async () => {
     const result = await getWelfareItems();
@@ -72,6 +72,7 @@ export default function GangDashboard() {
     requesterRole: "Leader" as "Leader" | "Deputy",
     receiverName: "",
     receiverDiscord: "",
+    receiverPhone: "",
     welfareItemId: "",
     welfareItemName: "",
     category: "" as string,
@@ -215,6 +216,31 @@ export default function GangDashboard() {
       setWelfareRequests(result.requests || []);
     }
   };
+
+  // คำนวณจำนวนคงเหลือของรายการสวัสดิการตามประเภทแก๊ง
+  const welfareRemaining = useMemo(() => {
+    if (!gangData?.type) return {} as Record<number, { name: string; limit: number | null; used: number; remaining: number | null }>;
+    const limitColumn =
+      gangData.type === "Family"
+        ? "family_limit"
+        : gangData.type === "Gangs-LD"
+        ? "female_gang_limit"
+        : "gang_limit";
+    const removedStatuses = ["เอาออกแล้ว", "เอาสวัสดิการออกแล้ว"];
+    const result: Record<number, { name: string; limit: number | null; used: number; remaining: number | null }> = {};
+    for (const item of welfareItems) {
+      const limit = (item as any)[limitColumn] ?? null;
+      const used = welfareRequests.filter(
+        (r) =>
+          r.welfareItem === item.name &&
+          (!r.requestType || r.requestType === "receive") &&
+          !removedStatuses.includes(r.status)
+      ).length;
+      const remaining = limit == null ? null : Math.max(0, limit - used);
+      result[item.id] = { name: item.name, limit, used, remaining };
+    }
+    return result;
+  }, [welfareItems, welfareRequests, gangData?.type]);
 
   // โหลดรายชื่อสภาสำหรับ dropdown ผู้อนุมัติ
   const loadCouncilNames = async () => {
@@ -380,8 +406,8 @@ export default function GangDashboard() {
 
     if (welfareSubTab === "receive") {
       requestType = "receive";
-      if (!welfareForm.receiverName || !welfareForm.receiverDiscord) {
-        alert("❌ กรุณากรอกชื่อและเลขดิสคอร์ดคนรับสวัสดิการ");
+      if (!welfareForm.receiverName || !welfareForm.receiverDiscord || !welfareForm.receiverPhone) {
+        alert("❌ กรุณากรอกชื่อ เลขดิสคอร์ด และเบอร์โทรคนรับสวัสดิการ");
         return;
       }
       if (!welfareForm.welfareItemId) {
@@ -395,6 +421,7 @@ export default function GangDashboard() {
       }
       details.receiverName = welfareForm.receiverName;
       details.receiverDiscord = welfareForm.receiverDiscord;
+      details.receiverPhone = welfareForm.receiverPhone;
       details.welfareItemId = selectedItem.id;
       details.welfareItemName = selectedItem.name;
       details.category = selectedItem.type;
@@ -455,6 +482,7 @@ export default function GangDashboard() {
         requesterRole: "Leader",
         receiverName: "",
         receiverDiscord: "",
+        receiverPhone: "",
         welfareItemId: "",
         welfareItemName: "",
         category: "",
@@ -538,11 +566,6 @@ export default function GangDashboard() {
     }
 
     if (isUniformActionNeedOld(uniformForm.actionType)) {
-      const missingOld = selectedPieces.some((p) => !uniformForm.oldPieceNumbers[p]);
-      if (missingOld) {
-        alert("❌ กรุณาใส่เลขชุดเดิมของทุกชิ้นส่วนที่เลือก");
-        return;
-      }
       if (!uniformForm.colorName || !uniformForm.hexColor) {
         alert("❌ กรุณาใส่ Color และ Hex Color");
         return;
@@ -1034,6 +1057,22 @@ export default function GangDashboard() {
                 ))}
               </div>
 
+              {Object.keys(welfareRemaining).length > 0 && (
+                <div className="flex flex-col gap-3 border border-white/10 p-4 rounded-xl bg-white/[0.02]">
+                  <h3 className="text-sm font-bold text-purple-400">คงเหลือสวัสดิการ</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {Object.entries(welfareRemaining).map(([id, item]) => (
+                      <div key={id} className="flex flex-col gap-1 p-3 rounded-lg bg-zinc-950 border border-white/[0.06]">
+                        <span className="text-xs text-zinc-400">{item.name}</span>
+                        <span className={`text-sm font-semibold ${item.remaining === 0 ? "text-red-400" : "text-white"}`}>
+                          {item.remaining === null ? "ไม่จำกัด" : `จำนวน ${item.remaining} / ${item.limit}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <form onSubmit={handleRequestWelfareSubmit} className="flex flex-col gap-5 w-full text-white border-b border-white/10 pb-8">
                 <h2 className="text-lg font-bold text-purple-400">
                   {welfareSubTab === "receive" && "🎁 ฟอร์มขอรับสวัสดิการ"}
@@ -1126,6 +1165,17 @@ export default function GangDashboard() {
                           required
                         />
                       </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-zinc-200">เบอร์โทรคนรับสวัสดิการ</label>
+                        <input
+                          type="tel"
+                          value={welfareForm.receiverPhone}
+                          onChange={(e) => setWelfareForm({ ...welfareForm, receiverPhone: e.target.value })}
+                          placeholder="เบอร์โทร"
+                          className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
+                          required
+                        />
+                      </div>
                     </div>
                     <div className="flex flex-col gap-2">
                       <label className="text-sm font-medium text-zinc-200">ประเภทสวัสดิการ</label>
@@ -1143,11 +1193,15 @@ export default function GangDashboard() {
                         className="w-full h-11 px-4 rounded-xl bg-zinc-900 border border-white/10 text-sm text-white focus:border-purple-400 focus:outline-none"
                       >
                         <option value="">-- เลือกสวัสดิการ --</option>
-                        {welfareItems.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
+                        {welfareItems.map((item) => {
+                          const rem = welfareRemaining[item.id];
+                          return (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                              {rem && (rem.remaining === null ? " (ไม่จำกัด)" : ` (คงเหลือ ${rem.remaining})`)}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                     {welfareForm.category === "car" && (
@@ -1219,14 +1273,19 @@ export default function GangDashboard() {
                       </div>
                       <div className="flex flex-col gap-2">
                         <label className="text-sm font-medium text-zinc-200">สวัสดิการที่มีอยู่</label>
-                        <input
-                          type="text"
+                        <select
                           value={welfareForm.tradeHolderWelfare}
                           onChange={(e) => setWelfareForm({ ...welfareForm, tradeHolderWelfare: e.target.value })}
-                          placeholder="เช่น Rebla 4 คัน"
-                          className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-sm focus:border-purple-400 focus:outline-none"
+                          className="w-full h-11 px-4 rounded-xl bg-zinc-900 border border-white/10 text-sm text-white focus:border-purple-400 focus:outline-none"
                           required
-                        />
+                        >
+                          <option value="">-- เลือกสวัสดิการ --</option>
+                          {welfareItems.map((item) => (
+                            <option key={item.id} value={item.name}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                     <h3 className="text-sm font-bold text-zinc-200 mt-2">ข้อมูลผู้รับสวัสดิการต่อ</h3>
@@ -1545,25 +1604,24 @@ export default function GangDashboard() {
                 {pieceOptions.filter((p) => uniformForm.pieces[p]).map((piece) => (
                   <div key={piece} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
                     <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium text-zinc-200">{piece} - เลขชุด</label>
+                      <label className="text-sm font-medium text-zinc-200">{piece} - เลขชุด (ถ้ามี)</label>
                       <input
                         type="text"
                         value={uniformForm.pieceNumbers[piece]}
                         onChange={(e) => handleUniformPieceNumberChange(piece, e.target.value, "new")}
-                        placeholder={`เลขชุด ${piece}`}
+                        placeholder={`เลขชุด ${piece} (ถ้ามี)`}
                         className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-teal-400 focus:outline-none text-sm"
                       />
                     </div>
                     {isUniformActionNeedOld(uniformForm.actionType) && (
                       <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-zinc-200">{piece} - เลขชุดเดิม</label>
+                        <label className="text-sm font-medium text-zinc-200">{piece} - เลขชุดเดิม (ถ้ามี)</label>
                         <input
                           type="text"
                           value={uniformForm.oldPieceNumbers[piece]}
                           onChange={(e) => handleUniformPieceNumberChange(piece, e.target.value, "old")}
-                          placeholder={`เลขชุดเดิม ${piece}`}
+                          placeholder={`เลขชุดเดิม ${piece} (ถ้ามี)`}
                           className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-teal-400 focus:outline-none text-sm"
-                          required
                         />
                       </div>
                     )}
