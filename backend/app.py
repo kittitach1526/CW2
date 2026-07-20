@@ -1519,6 +1519,49 @@ def delete_council_user(id):
         db.close()
 
 
+@app.route("/api/council/<int:id>", methods=["PATCH"])
+def update_council_user(id):
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    username = (data.get("username") or "").strip()
+    password = data.get("password", "")
+    status = data.get("status")
+    db = get_db()
+    try:
+        existing = db.execute("SELECT * FROM council_users WHERE id = ?", (id,)).fetchone()
+        if not existing:
+            return jsonify({"success": False, "message": "❌ ไม่พบบัญชีสภา"}), 404
+        if username and username != existing["username"]:
+            dup = db.execute("SELECT id FROM council_users WHERE username = ? AND id != ?", (username, id)).fetchone()
+            if dup:
+                return jsonify({"success": False, "message": "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว"}), 409
+        fields = []
+        values = []
+        if name:
+            fields.append("name = ?")
+            values.append(name)
+        if username:
+            fields.append("username = ?")
+            values.append(username)
+        if password:
+            fields.append("password = ?")
+            values.append(password)
+        if status:
+            fields.append("status = ?")
+            values.append(status)
+        if not fields:
+            return jsonify({"success": False, "message": "❌ ไม่มีข้อมูลที่จะอัปเดต"}), 400
+        values.append(id)
+        db.execute(f"UPDATE council_users SET {', '.join(fields)} WHERE id = ?", values)
+        db.commit()
+        _log_action(db)
+        return jsonify({"success": True, "message": "✅ อัปเดตบัญชีสภาเรียบร้อยแล้ว"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตบัญชีสภาได้"}), 500
+    finally:
+        db.close()
+
+
 # ---------------------------------------------------------------------------
 # Admin Users
 # ---------------------------------------------------------------------------
@@ -1620,6 +1663,49 @@ def delete_admin_user(id):
         return jsonify({"success": True, "message": "🗑️ ลบบัญชีแอดมินเรียบร้อยแล้ว"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถลบบัญชีแอดมินได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/admin/<int:id>", methods=["PATCH"])
+def update_admin_user(id):
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    username = (data.get("username") or "").strip()
+    password = data.get("password", "")
+    status = data.get("status")
+    db = get_db()
+    try:
+        existing = db.execute("SELECT * FROM admin_users WHERE id = ?", (id,)).fetchone()
+        if not existing:
+            return jsonify({"success": False, "message": "❌ ไม่พบบัญชีแอดมิน"}), 404
+        if username and username != existing["username"]:
+            dup = db.execute("SELECT id FROM admin_users WHERE username = ? AND id != ?", (username, id)).fetchone()
+            if dup:
+                return jsonify({"success": False, "message": "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว"}), 409
+        fields = []
+        values = []
+        if name:
+            fields.append("name = ?")
+            values.append(name)
+        if username:
+            fields.append("username = ?")
+            values.append(username)
+        if password:
+            fields.append("password = ?")
+            values.append(password)
+        if status:
+            fields.append("status = ?")
+            values.append(status)
+        if not fields:
+            return jsonify({"success": False, "message": "❌ ไม่มีข้อมูลที่จะอัปเดต"}), 400
+        values.append(id)
+        db.execute(f"UPDATE admin_users SET {', '.join(fields)} WHERE id = ?", values)
+        db.commit()
+        _log_action(db)
+        return jsonify({"success": True, "message": "✅ อัปเดตบัญชีแอดมินเรียบร้อยแล้ว"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตบัญชีแอดมินได้"}), 500
     finally:
         db.close()
 

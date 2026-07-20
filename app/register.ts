@@ -363,8 +363,14 @@ export async function getAllCouncilUsers() {
   return apiFetch("GET", "/api/council");
 }
 
-export async function createCouncilUser(formData: FormData) {
-  const payload = formDataToObject(formData);
+export async function createCouncilUser(
+  formData: FormData,
+  actor?: string,
+  actorRole?: string
+) {
+  const payload = formDataToObject(formData) as ApiPayload;
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
   return apiFetch("POST", "/api/council", payload);
 }
 
@@ -378,6 +384,18 @@ export async function updateCouncilUserStatus(
   if (actor) payload.actor = actor;
   if (actorRole) payload.actorRole = actorRole;
   return apiFetch("PATCH", `/api/council/${id}/status`, payload);
+}
+
+export async function updateCouncilUser(
+  id: number,
+  formData: FormData,
+  actor?: string,
+  actorRole?: string
+) {
+  const payload = formDataToObject(formData) as ApiPayload;
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("PATCH", `/api/council/${id}`, payload);
 }
 
 export async function deleteCouncilUser(id: number, actor?: string, actorRole?: string) {
@@ -399,8 +417,14 @@ export async function getAllAdminUsers() {
   return apiFetch("GET", "/api/admin");
 }
 
-export async function createAdminUser(formData: FormData) {
-  const payload = formDataToObject(formData);
+export async function createAdminUser(
+  formData: FormData,
+  actor?: string,
+  actorRole?: string
+) {
+  const payload = formDataToObject(formData) as ApiPayload;
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
   return apiFetch("POST", "/api/admin", payload);
 }
 
@@ -414,6 +438,18 @@ export async function updateAdminUserStatus(
   if (actor) payload.actor = actor;
   if (actorRole) payload.actorRole = actorRole;
   return apiFetch("PATCH", `/api/admin/${id}/status`, payload);
+}
+
+export async function updateAdminUser(
+  id: number,
+  formData: FormData,
+  actor?: string,
+  actorRole?: string
+) {
+  const payload = formDataToObject(formData) as ApiPayload;
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("PATCH", `/api/admin/${id}`, payload);
 }
 
 export async function deleteAdminUser(id: number, actor?: string, actorRole?: string) {

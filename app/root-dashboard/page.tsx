@@ -8,6 +8,8 @@ import {
   getAllAdminUsers,
   createCouncilUser,
   createAdminUser,
+  updateCouncilUser,
+  updateAdminUser,
   updateCouncilUserStatus,
   updateAdminUserStatus,
   deleteCouncilUser,
@@ -37,9 +39,12 @@ function getInitialRoot(): { username: string } | null {
 export default function RootDashboard() {
   const router = useRouter();
   const [rootData] = useState(getInitialRoot);
+  const activeActor = rootData?.username || "root";
+  const activeActorRole = "root";
   const [activeTab, setActiveTab] = useState<"council" | "admin">("council");
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [councilUsers, setCouncilUsers] = useState<UserRow[]>([]);
   const [adminUsers, setAdminUsers] = useState<UserRow[]>([]);
   const [statusModal, setStatusModal] = useState<{ open: boolean; type: "success" | "error"; message: string }>({
@@ -89,7 +94,9 @@ export default function RootDashboard() {
 
     try {
       const result =
-        activeTab === "council" ? await createCouncilUser(formData) : await createAdminUser(formData);
+        activeTab === "council"
+          ? await createCouncilUser(formData, activeActor, activeActorRole)
+          : await createAdminUser(formData, activeActor, activeActorRole);
 
       setStatusModal({ open: true, type: result.success ? "success" : "error", message: result.message });
 
@@ -109,8 +116,8 @@ export default function RootDashboard() {
     const nextStatus = currentStatus === "ระงับใช้งาน" ? "อนุมัติ" : "ระงับใช้งาน";
     const result =
       activeTab === "council"
-        ? await updateCouncilUserStatus(id, nextStatus)
-        : await updateAdminUserStatus(id, nextStatus);
+        ? await updateCouncilUserStatus(id, nextStatus, activeActor, activeActorRole)
+        : await updateAdminUserStatus(id, nextStatus, activeActor, activeActorRole);
 
     if (result.success) {
       if (activeTab === "council") {
@@ -126,7 +133,10 @@ export default function RootDashboard() {
   const handleDelete = async (id: number) => {
     if (!confirm("⚠️ ยืนยันการลบบัญชีนี้ออกจากระบบ? การกระทำนี้ไม่สามารถย้อนกลับได้")) return;
 
-    const result = activeTab === "council" ? await deleteCouncilUser(id) : await deleteAdminUser(id);
+    const result =
+      activeTab === "council"
+        ? await deleteCouncilUser(id, activeActor, activeActorRole)
+        : await deleteAdminUser(id, activeActor, activeActorRole);
 
     if (result.success) {
       if (activeTab === "council") {
@@ -136,6 +146,24 @@ export default function RootDashboard() {
       }
     } else {
       setStatusModal({ open: true, type: "error", message: result.message });
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    const formData = new FormData(e.currentTarget);
+    const result =
+      activeTab === "council"
+        ? await updateCouncilUser(editingUser.id, formData, activeActor, activeActorRole)
+        : await updateAdminUser(editingUser.id, formData, activeActor, activeActorRole);
+
+    setStatusModal({ open: true, type: result.success ? "success" : "error", message: result.message });
+
+    if (result.success) {
+      setEditingUser(null);
+      fetchData();
     }
   };
 
@@ -325,6 +353,12 @@ export default function RootDashboard() {
                         <td className="px-6 py-4 text-center">
                           <div className="flex justify-center gap-2">
                             <button
+                              onClick={() => setEditingUser(user)}
+                              className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500 hover:text-white text-indigo-300 border border-indigo-500/20 rounded-lg transition-all text-[11px]"
+                            >
+                              แก้ไข
+                            </button>
+                            <button
                               onClick={() => handleToggleStatus(user.id, user.status)}
                               className="px-3 py-1.5 bg-white/10 hover:bg-white hover:text-black font-medium rounded-lg border border-white/10 transition-all text-[11px] shadow-sm"
                             >
@@ -346,6 +380,72 @@ export default function RootDashboard() {
             </div>
           )}
         </div>
+        {editingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <div className="w-full max-w-md bg-zinc-900/90 border border-white/10 rounded-2xl p-6 shadow-2xl">
+              <h3 className="text-lg font-bold text-white mb-4">
+                แก้ไขบัญชี{activeTab === "council" ? "สภา" : "แอดมิน"}
+              </h3>
+              <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
+                <div>
+                  <label className="text-xs text-zinc-300">ชื่อ-นามสกุล</label>
+                  <input
+                    type="text"
+                    name="name"
+                    defaultValue={editingUser.name}
+                    required
+                    className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-300">Username</label>
+                  <input
+                    type="text"
+                    name="username"
+                    defaultValue={editingUser.username}
+                    required
+                    className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-300">Password (เว้นว่างหากไม่เปลี่ยน)</label>
+                  <input
+                    type="password"
+                    name="password"
+                    placeholder="••••••••"
+                    className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-300">สถานะ</label>
+                  <select
+                    name="status"
+                    defaultValue={editingUser.status}
+                    className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
+                  >
+                    <option value="อนุมัติ">อนุมัติ</option>
+                    <option value="ระงับใช้งาน">ระงับใช้งาน</option>
+                  </select>
+                </div>
+                <div className="flex gap-3 justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(null)}
+                    className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 text-sm"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium"
+                  >
+                    บันทึก
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </main>
 
       <StatusModal
