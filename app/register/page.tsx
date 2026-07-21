@@ -148,6 +148,11 @@ export default function Home() {
               <input type="text" name="leaderDiscord" placeholder="เช่น 3948571029485761" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" required />
             </div>
 
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-zinc-200">เบอร์โทรหัวหน้า (Leader Phone)</label>
+              <input type="tel" name="leaderPhone" placeholder="เช่น 0812345678" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" required />
+            </div>
+
             {/* ─── โซนข้อมูลรองหัวหน้าคนที่ 1 ─── */}
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-zinc-200">รองหัวหน้า 1</label>
@@ -159,6 +164,11 @@ export default function Home() {
               <input type="text" name="coLeader1Discord" placeholder="เช่น 3948571029485762" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
             </div>
 
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-zinc-200">เบอร์โทรรอง 1 (Co-Leader 1 Phone)</label>
+              <input type="tel" name="coLeader1Phone" placeholder="เช่น 0812345678" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
+            </div>
+
             {/* ─── โซนข้อมูลรองหัวหน้าคนที่ 2 ─── */}
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-zinc-200">รองหัวหน้า 2</label>
@@ -168,6 +178,11 @@ export default function Home() {
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-zinc-200">เลขดิสคอร์ดรอง 2 (Co-Leader 2 Discord ID)</label>
               <input type="text" name="coLeader2Discord" placeholder="เช่น 3948571029485763" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-zinc-200">เบอร์โทรรอง 2 (Co-Leader 2 Phone)</label>
+              <input type="tel" name="coLeader2Phone" placeholder="เช่น 0812345678" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
             </div>
 
             {/* ─── โซนผู้อนุมัติแก๊ง ─── */}

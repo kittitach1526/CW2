@@ -351,8 +351,10 @@ def register_gang():
             """
             INSERT INTO gangs
             (fullName, abbreviation, password, colorTheme, type, leader, leaderDiscord,
-             coLeader1, coLeader1Discord, coLeader2, coLeader2Discord, approver, logoUrl, status, createdAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             coLeader1, coLeader1Discord, coLeader2, coLeader2Discord,
+             leaderPhone, coLeader1Phone, coLeader2Phone,
+             approver, logoUrl, status, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 data["fullName"].strip(),
@@ -366,6 +368,9 @@ def register_gang():
                 data.get("coLeader1Discord") or None,
                 data.get("coLeader2") or None,
                 data.get("coLeader2Discord") or None,
+                (data.get("leaderPhone") or "").strip() or None,
+                (data.get("coLeader1Phone") or "").strip() or None,
+                (data.get("coLeader2Phone") or "").strip() or None,
                 data["approver"].strip(),
                 data.get("logoUrl") or None,
                 "pending",
