@@ -374,6 +374,22 @@ export async function deleteWelfareItem(id: number, actor?: string, actorRole?: 
   return apiFetch("DELETE", `/api/welfare-items/${id}`, payload);
 }
 
+export async function getWelfareItemGangLimits(itemId: number) {
+  return apiFetch("GET", `/api/welfare-items/${itemId}/gangs`);
+}
+
+export async function updateWelfareItemGangLimits(
+  itemId: number,
+  gangLimits: { gangId: number; item_limit?: number | null; active?: boolean }[],
+  actor?: string,
+  actorRole?: string
+) {
+  const payload: ApiPayload = { gangLimits };
+  if (actor) payload.actor = actor;
+  if (actorRole) payload.actorRole = actorRole;
+  return apiFetch("POST", `/api/welfare-items/${itemId}/gangs`, payload);
+}
+
 // ---------------------------------------------------------------------------
 // Council Users
 // ---------------------------------------------------------------------------

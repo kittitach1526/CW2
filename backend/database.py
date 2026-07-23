@@ -146,6 +146,18 @@ def init_db():
             createdAt TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS gang_welfare_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gangId INTEGER NOT NULL,
+            welfareItemId INTEGER NOT NULL,
+            item_limit INTEGER,
+            active INTEGER DEFAULT 1,
+            createdAt TEXT,
+            UNIQUE(gangId, welfareItemId),
+            FOREIGN KEY (gangId) REFERENCES gangs(id) ON DELETE CASCADE,
+            FOREIGN KEY (welfareItemId) REFERENCES welfare_items(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS welfare_seasons (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -170,7 +182,7 @@ def init_db():
 
         CREATE TABLE IF NOT EXISTS council_users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
+            name TEXT NOT NULL UNIQUE,
             username TEXT NOT NULL UNIQUE,
             password TEXT NOT NULL,
             status TEXT DEFAULT 'รอรับ',
@@ -206,10 +218,8 @@ def init_db():
     # Run lightweight migrations to add any columns added after the DB was first created
     migrate_db(conn)
 
-    # Seed default root users for testing
+    # Seed default root users once for bootstrapping only
     seed_root_users(conn)
-    seed_council_users(conn)
-    seed_welfare_items(conn)
 
     conn.close()
 
@@ -245,6 +255,14 @@ def migrate_db(conn):
     add_column("welfare_items", "family_limit", "INTEGER")
     add_column("system_logs", "description", "TEXT")
 
+    # Enforce unique council user names to prevent duplicates created by seeding/manual edits
+    try:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_council_users_name ON council_users(name)")
+        conn.commit()
+        print("[migrate] Unique index on council_users(name) ensured")
+    except Exception as e:
+        print(f"[migrate] Could not enforce unique council name index (duplicates may exist): {e}")
+
     # If an older schema made approverDiscord NOT NULL, normalize it so new forms can leave it empty
     try:
         cursor = conn.execute("PRAGMA table_info(uniform_files)")
@@ -259,63 +277,32 @@ def migrate_db(conn):
     except Exception as e:
         print(f"[migrate] approverDiscord normalization skipped: {e}")
 
-
-COUNCIL_USER_NAMES = [
-    "Kacie Svia",
-    "Vee Mahattanpattamakorn",
-    "Matoko Kennedy",
-    "Aunyong Howcanmydaybebad",
-    "Mapao Yakdonjoobbabdoublll",
-    "Haru Haruka",
-    "Jaoayla Aowtaejai",
-    "Perz Teryakdaiaraitertellmedai",
-    "Mudu Blackcouncil",
-    "Ryuga Xenia",
-    "Nongfxryou YGz",
-    "Frost Dekmairakde",
-    "Naomi Katagaki",
-    "Beam Ilovesaran",
-    "Nongalin Aowtaejai",
-]
-
-
-def _slug(text):
-    return "".join(c for c in text.lower() if c.isalnum())
-
-
-def seed_council_users(conn):
-    default_password = "council"
-    created_at = now_thai()
+    # Seed initial per-gang welfare item limits from legacy type-based limits
     try:
-        for name in COUNCIL_USER_NAMES:
-            username = _slug(name) or f"council{hash(name) & 0xFFFFFFFF}"
-            conn.execute(
-                "INSERT OR IGNORE INTO council_users (name, username, password, status, createdAt) VALUES (?, ?, ?, ?, ?)",
-                (name, username, default_password, "อนุมัติ", created_at),
-            )
-        conn.commit()
-        print("Seeded council users:", len(COUNCIL_USER_NAMES))
-    except Exception as e:
-        print("Seed council users failed:", e)
-
-
-def seed_welfare_items(conn):
-    try:
-        count = conn.execute("SELECT COUNT(*) FROM welfare_items").fetchone()[0]
-        if count == 0:
+        rows = conn.execute(
+            """
+            SELECT id, gang_limit, female_gang_limit, family_limit
+            FROM welfare_items
+            WHERE id NOT IN (SELECT DISTINCT welfareItemId FROM gang_welfare_items WHERE welfareItemId IS NOT NULL)
+            """
+        ).fetchall()
+        if rows:
+            gangs = conn.execute("SELECT id, type FROM gangs").fetchall()
+            type_to_column = {"Gang": "gang_limit", "Gangs-LD": "female_gang_limit", "Family": "family_limit"}
             created_at = now_thai()
-            conn.execute(
-                "INSERT INTO welfare_items (name, type, active, createdAt) VALUES (?, ?, 1, ?)",
-                ("สวัสดิการอาวุธ", "weapon", created_at),
-            )
-            conn.execute(
-                "INSERT INTO welfare_items (name, type, active, createdAt) VALUES (?, ?, 1, ?)",
-                ("สวัสดิการรถ", "car", created_at),
-            )
+            for item in rows:
+                for gang in gangs:
+                    col = type_to_column.get(gang["type"], "gang_limit")
+                    limit = item[col]
+                    if limit is not None:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO gang_welfare_items (gangId, welfareItemId, item_limit, active, createdAt) VALUES (?, ?, ?, 1, ?)",
+                            (gang["id"], item["id"], limit, created_at),
+                        )
             conn.commit()
-            print("Seeded welfare items")
+            print("[migrate] Seeded gang_welfare_items from legacy type limits")
     except Exception as e:
-        print(f"Seed welfare items failed: {e}")
+        print(f"[migrate] gang_welfare_items seeding skipped: {e}")
 
 
 def seed_root_users(conn):
@@ -323,11 +310,11 @@ def seed_root_users(conn):
     created_at = now_thai()
     try:
         conn.execute(
-            "INSERT OR REPLACE INTO council_users (name, username, password, status, createdAt) VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO council_users (name, username, password, status, createdAt) VALUES (?, ?, ?, ?, ?)",
             ("Root Council", "root", root_password, "อนุมัติ", created_at),
         )
         conn.execute(
-            "INSERT OR REPLACE INTO admin_users (name, username, password, status, createdAt) VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO admin_users (name, username, password, status, createdAt) VALUES (?, ?, ?, ?, ?)",
             ("Root Admin", "root", root_password, "อนุมัติ", created_at),
         )
         conn.commit()

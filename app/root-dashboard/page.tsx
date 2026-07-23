@@ -380,73 +380,74 @@ export default function RootDashboard() {
             </div>
           )}
         </div>
-        {editingUser && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-            <div className="w-full max-w-md bg-zinc-900/90 border border-white/10 rounded-2xl p-6 shadow-2xl">
-              <h3 className="text-lg font-bold text-white mb-4">
-                แก้ไขบัญชี{activeTab === "council" ? "สภา" : "แอดมิน"}
-              </h3>
-              <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
-                <div>
-                  <label className="text-xs text-zinc-300">ชื่อ-นามสกุล</label>
-                  <input
-                    type="text"
-                    name="name"
-                    defaultValue={editingUser.name}
-                    required
-                    className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-300">Username</label>
-                  <input
-                    type="text"
-                    name="username"
-                    defaultValue={editingUser.username}
-                    required
-                    className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-300">Password (เว้นว่างหากไม่เปลี่ยน)</label>
-                  <input
-                    type="password"
-                    name="password"
-                    placeholder="••••••••"
-                    className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-300">สถานะ</label>
-                  <select
-                    name="status"
-                    defaultValue={editingUser.status}
-                    className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
-                  >
-                    <option value="อนุมัติ">อนุมัติ</option>
-                    <option value="ระงับใช้งาน">ระงับใช้งาน</option>
-                  </select>
-                </div>
-                <div className="flex gap-3 justify-end mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditingUser(null)}
-                    className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 text-sm"
-                  >
-                    ยกเลิก
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium"
-                  >
-                    บันทึก
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </main>
+
+      {editingUser && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-zinc-900/90 border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-4">
+              แก้ไขบัญชี{activeTab === "council" ? "สภา" : "แอดมิน"}
+            </h3>
+            <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
+              <div>
+                <label className="text-xs text-zinc-300">ชื่อ-นามสกุล</label>
+                <input
+                  type="text"
+                  name="name"
+                  defaultValue={editingUser.name}
+                  required
+                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-300">Username</label>
+                <input
+                  type="text"
+                  name="username"
+                  defaultValue={editingUser.username}
+                  required
+                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-300">Password (เว้นว่างหากไม่เปลี่ยน)</label>
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="••••••••"
+                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-300">สถานะ</label>
+                <select
+                  name="status"
+                  defaultValue={editingUser.status}
+                  className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white focus:border-indigo-400 focus:outline-none"
+                >
+                  <option value="อนุมัติ">อนุมัติ</option>
+                  <option value="ระงับใช้งาน">ระงับใช้งาน</option>
+                </select>
+              </div>
+              <div className="flex gap-3 justify-end mt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 text-sm"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-medium"
+                >
+                  บันทึก
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <StatusModal
         open={statusModal.open}

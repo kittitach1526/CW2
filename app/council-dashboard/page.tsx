@@ -25,6 +25,8 @@ import {
   createWelfareItem,
   updateWelfareItem,
   deleteWelfareItem,
+  getWelfareItemGangLimits,
+  updateWelfareItemGangLimits,
   logFrontendAction,
 } from "../register";
 import Modal from "../components/Modal";
@@ -60,6 +62,10 @@ export default function CouncilAdminDashboard() {
   const [newTypeInput, setNewTypeInput] = useState("");
   const [selectedGang, setSelectedGang] = useState<any>(null);
   const [isGangModalOpen, setIsGangModalOpen] = useState(false);
+  const [isWelfareGangModalOpen, setIsWelfareGangModalOpen] = useState(false);
+  const [editingWelfareItemForGangs, setEditingWelfareItemForGangs] = useState<any>(null);
+  const [welfareGangLimits, setWelfareGangLimits] = useState<any[]>([]);
+  const [welfareGangLimitsLoading, setWelfareGangLimitsLoading] = useState(false);
 
   // 1. ตรวจสอบสิทธิ์ผู้ดูแลระบบสภากลาง
   useEffect(() => {
@@ -249,9 +255,6 @@ export default function CouncilAdminDashboard() {
   const resetWelfareItemForm = () => {
     setWelfareItemName("");
     setWelfareItemType("");
-    setWelfareItemGangLimit("");
-    setWelfareItemFemaleGangLimit("");
-    setWelfareItemFamilyLimit("");
     setEditingWelfareItemId(null);
   };
 
@@ -263,16 +266,9 @@ export default function CouncilAdminDashboard() {
     }
     setLoading(true);
     try {
-      const parseLimit = (value: string) => {
-        const num = Number(value);
-        return value.trim() === "" || Number.isNaN(num) ? null : num;
-      };
       const payload = {
         name: welfareItemName.trim(),
         type: welfareItemType.trim(),
-        gang_limit: parseLimit(welfareItemGangLimit),
-        female_gang_limit: parseLimit(welfareItemFemaleGangLimit),
-        family_limit: parseLimit(welfareItemFamilyLimit),
       };
       const result = editingWelfareItemId
         ? await updateWelfareItem(editingWelfareItemId, payload, currentActor, currentActorRole)
@@ -295,9 +291,6 @@ export default function CouncilAdminDashboard() {
   const handleEditWelfareItem = (item: any) => {
     setWelfareItemName(item.name || "");
     setWelfareItemType(item.type || "");
-    setWelfareItemGangLimit(item.gang_limit?.toString() || "");
-    setWelfareItemFemaleGangLimit(item.female_gang_limit?.toString() || "");
-    setWelfareItemFamilyLimit(item.family_limit?.toString() || "");
     setEditingWelfareItemId(item.id);
   };
 
@@ -317,6 +310,77 @@ export default function CouncilAdminDashboard() {
     } catch (error) {
       setLoading(false);
       showStatus({ type: "error", message: "❌ เกิดข้อผิดพลาดในการลบรายการสวัสดิการ" });
+    }
+  };
+
+  const openWelfareGangModal = async (item: any) => {
+    setEditingWelfareItemForGangs(item);
+    setIsWelfareGangModalOpen(true);
+    setWelfareGangLimitsLoading(true);
+    try {
+      const result = await getWelfareItemGangLimits(item.id);
+      if (result.success) {
+        setWelfareGangLimits((result.gangs || []).map((g: any) => ({
+          ...g,
+          item_limit: g.item_limit === null || g.item_limit === undefined ? "" : String(g.item_limit),
+          active: g.active === 0 ? false : true,
+        })));
+      } else {
+        setWelfareGangLimits([]);
+        showStatus({ type: "error", message: result.message || "❌ ไม่สามารถดึงข้อมูลแก๊งได้" });
+      }
+    } catch (error) {
+      setWelfareGangLimits([]);
+      showStatus({ type: "error", message: "❌ ไม่สามารถเชื่อมต่อกับระบบหลังบ้านได้" });
+    } finally {
+      setWelfareGangLimitsLoading(false);
+    }
+  };
+
+  const closeWelfareGangModal = () => {
+    setIsWelfareGangModalOpen(false);
+    setEditingWelfareItemForGangs(null);
+    setWelfareGangLimits([]);
+  };
+
+  const updateWelfareGangLimit = (gangId: number, value: string) => {
+    setWelfareGangLimits((prev) =>
+      prev.map((g) => (g.id === gangId ? { ...g, item_limit: value } : g))
+    );
+  };
+
+  const toggleWelfareGangActive = (gangId: number) => {
+    setWelfareGangLimits((prev) =>
+      prev.map((g) => (g.id === gangId ? { ...g, active: !g.active } : g))
+    );
+  };
+
+  const handleSaveWelfareGangLimits = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingWelfareItemForGangs) return;
+    setLoading(true);
+    try {
+      const gangLimits = welfareGangLimits.map((g) => ({
+        gangId: g.id,
+        item_limit: g.item_limit?.toString().trim() === "" ? null : Number(g.item_limit),
+        active: g.active,
+      }));
+      const result = await updateWelfareItemGangLimits(
+        editingWelfareItemForGangs.id,
+        gangLimits,
+        currentActor,
+        currentActorRole
+      );
+      setLoading(false);
+      if (result.success) {
+        showStatus({ type: "success", message: result.message });
+        closeWelfareGangModal();
+      } else {
+        showStatus({ type: "error", message: result.message || "❌ ไม่สามารถบันทึกได้" });
+      }
+    } catch (error) {
+      setLoading(false);
+      showStatus({ type: "error", message: "❌ เกิดข้อผิดพลาดในการบันทึกสวัสดิการรายแก๊ง" });
     }
   };
 
@@ -1106,11 +1170,24 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                       className="h-9 px-3 rounded-lg bg-zinc-950 border border-white/[0.06] text-zinc-300 text-xs focus:outline-none"
                     >
                       <option value="">-- เลือกแก๊ง --</option>
-                      {gangsList.map((gang) => (
-                        <option key={gang.abbreviation} value={gang.abbreviation}>
-                          {gang.fullName} [{gang.abbreviation}]
-                        </option>
-                      ))}
+                      {[
+                        { key: "Gang", label: "Gang" },
+                        { key: "Gangs-LD", label: "Gang-LD" },
+                        { key: "Family", label: "Family" },
+                      ].map(({ key, label }) => {
+                        const group = gangsList.filter(
+                          (g) => (g.type || "Gang") === key && g.status === "approved"
+                        );
+                        return (
+                          <optgroup key={key} label={label}>
+                            {group.map((gang) => (
+                              <option key={gang.abbreviation} value={gang.abbreviation}>
+                                {gang.fullName} [{gang.abbreviation}]
+                              </option>
+                            ))}
+                          </optgroup>
+                        );
+                      })}
                     </select>
                   </div>
                   <div className="overflow-x-auto">
@@ -1164,7 +1241,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                     <h2 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">📦 จัดการรายการสวัสดิการ</h2>
                   </div>
                   <div className="p-5 flex flex-col gap-6">
-                    <form onSubmit={handleSaveWelfareItem} className="grid grid-cols-1 sm:grid-cols-8 gap-4 items-end">
+                    <form onSubmit={handleSaveWelfareItem} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
                       <div className="flex flex-col gap-2 sm:col-span-2">
                         <label className="text-xs font-medium text-zinc-400">ชื่อสวัสดิการ</label>
                         <input
@@ -1193,40 +1270,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                           ))}
                         </datalist>
                       </div>
-                      <div className="flex flex-col gap-2 sm:col-span-1">
-                        <label className="text-xs font-medium text-zinc-400">แก๊ง</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={welfareItemGangLimit}
-                          onChange={(e) => setWelfareItemGangLimit(e.target.value)}
-                          placeholder="ไม่จำกัด"
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-white/[0.06] text-zinc-200 text-xs focus:outline-none"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-2 sm:col-span-1">
-                        <label className="text-xs font-medium text-zinc-400">แก๊งหญิง</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={welfareItemFemaleGangLimit}
-                          onChange={(e) => setWelfareItemFemaleGangLimit(e.target.value)}
-                          placeholder="ไม่จำกัด"
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-white/[0.06] text-zinc-200 text-xs focus:outline-none"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-2 sm:col-span-1">
-                        <label className="text-xs font-medium text-zinc-400">ครอบครัว</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={welfareItemFamilyLimit}
-                          onChange={(e) => setWelfareItemFamilyLimit(e.target.value)}
-                          placeholder="ไม่จำกัด"
-                          className="w-full h-10 px-3 rounded-lg bg-zinc-950 border border-white/[0.06] text-zinc-200 text-xs focus:outline-none"
-                        />
-                      </div>
-                      <div className="flex flex-wrap gap-2 sm:col-span-2 items-end">
+                      <div className="flex flex-wrap gap-2 sm:col-span-1 items-end">
                         <button
                           type="button"
                           onClick={() => {
@@ -1296,21 +1340,94 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                       </div>
                     </Modal>
 
+                    <Modal
+                      isOpen={isWelfareGangModalOpen}
+                      onClose={closeWelfareGangModal}
+                      title={editingWelfareItemForGangs ? `จัดการแก๊งสำหรับ ${editingWelfareItemForGangs.name}` : "จัดการแก๊ง"}
+                    >
+                      <form onSubmit={handleSaveWelfareGangLimits} className="flex flex-col gap-4 max-h-[60vh]">
+                        {welfareGangLimitsLoading ? (
+                          <div className="text-center py-8 text-zinc-500">⏳ กำลังโหลดข้อมูลแก๊ง...</div>
+                        ) : (
+                          <>
+                            <div className="overflow-y-auto border border-white/[0.06] rounded-xl max-h-[45vh]">
+                              <table className="w-full text-xs text-left">
+                                <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06] sticky top-0">
+                                  <tr>
+                                    <th className="px-4 py-3">แก๊ง</th>
+                                    <th className="px-4 py-3 text-center">ประเภท</th>
+                                    <th className="px-4 py-3 text-center">เปิดใช้</th>
+                                    <th className="px-4 py-3 text-center">จำกัด (คน)</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/[0.04]">
+                                  {welfareGangLimits.length === 0 ? (
+                                    <tr><td colSpan={4} className="text-center py-8 text-zinc-500">ไม่มีแก๊งในระบบ</td></tr>
+                                  ) : (
+                                    welfareGangLimits.map((g) => (
+                                      <tr key={g.id} className="text-zinc-300">
+                                        <td className="px-4 py-3">{g.fullName}</td>
+                                        <td className="px-4 py-3 text-center text-zinc-400">{g.type || '-'}</td>
+                                        <td className="px-4 py-3 text-center">
+                                          <input
+                                            type="checkbox"
+                                            checked={g.active}
+                                            onChange={() => toggleWelfareGangActive(g.id)}
+                                            className="accent-blue-500 w-4 h-4"
+                                          />
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            value={g.item_limit}
+                                            onChange={(e) => updateWelfareGangLimit(g.id, e.target.value)}
+                                            placeholder="ไม่จำกัด"
+                                            disabled={!g.active}
+                                            className="w-20 h-8 px-2 rounded-lg bg-zinc-950 border border-white/[0.06] text-zinc-200 text-xs text-center focus:outline-none disabled:opacity-30"
+                                          />
+                                        </td>
+                                      </tr>
+                                    ))
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                            <p className="text-[10px] text-zinc-500">
+                              * เว้นช่องจำกัดว่าง = ไม่จำกัด | ปิดใช้งาน = แก๊งนี้ไม่สามารถขอรับสวัสดิการนี้ได้
+                            </p>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={closeWelfareGangModal}
+                                className="h-9 px-4 rounded-lg bg-zinc-800 text-zinc-300 border border-white/10 hover:bg-zinc-700 text-xs font-medium transition-all"
+                              >
+                                ยกเลิก
+                              </button>
+                              <button
+                                type="submit"
+                                className="h-9 px-4 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 text-xs font-medium transition-all"
+                              >
+                                💾 บันทึก
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </form>
+                    </Modal>
+
                     <div className="overflow-x-auto border border-white/[0.04] rounded-xl">
                       <table className="w-full text-xs text-left whitespace-nowrap">
                         <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06]">
                           <tr>
                             <th className="px-6 py-4">ชื่อสวัสดิการ</th>
                             <th className="px-6 py-4">ประเภท</th>
-                            <th className="px-6 py-4 text-center">แก๊ง</th>
-                            <th className="px-6 py-4 text-center">แก๊งหญิง</th>
-                            <th className="px-6 py-4 text-center">ครอบครัว</th>
                             <th className="px-6 py-4 text-center">จัดการ</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-white/[0.04] text-zinc-300">
                           {welfareItems.length === 0 ? (
-                            <tr><td colSpan={6} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีรายการสวัสดิการในระบบ</td></tr>
+                            <tr><td colSpan={3} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีรายการสวัสดิการในระบบ</td></tr>
                           ) : (
                             welfareItems.map((item) => (
                               <tr key={item.id} className="hover:bg-white/[0.01] transition-colors">
@@ -1322,11 +1439,14 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                                     {item.type === 'car' ? 'รถ' : item.type === 'weapon' ? 'อาวุธ' : item.type || 'อื่นๆ'}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-center text-zinc-400">{item.gang_limit === null || item.gang_limit === undefined ? 'ไม่จำกัด' : item.gang_limit}</td>
-                                <td className="px-6 py-4 text-center text-zinc-400">{item.female_gang_limit === null || item.female_gang_limit === undefined ? 'ไม่จำกัด' : item.female_gang_limit}</td>
-                                <td className="px-6 py-4 text-center text-zinc-400">{item.family_limit === null || item.family_limit === undefined ? 'ไม่จำกัด' : item.family_limit}</td>
                                 <td className="px-6 py-4">
                                   <div className="flex justify-center gap-2">
+                                    <button
+                                      onClick={() => openWelfareGangModal(item)}
+                                      className="px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/20 text-[11px] transition-all"
+                                    >
+                                      จัดการแก๊ง
+                                    </button>
                                     <button
                                       onClick={() => handleEditWelfareItem(item)}
                                       className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 text-[11px] transition-all"

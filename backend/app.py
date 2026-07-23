@@ -1283,30 +1283,40 @@ def create_welfare_request():
                 "SELECT * FROM welfare_items WHERE name = ? AND active = 1", (welfare_item,)
             ).fetchone()
             gang = db.execute(
-                "SELECT type FROM gangs WHERE abbreviation = ?", (gang_abbreviation,)
+                "SELECT id, type, fullName FROM gangs WHERE abbreviation = ?", (gang_abbreviation,)
             ).fetchone() if gang_abbreviation else None
             if item and gang:
-                limit_column = {
-                    "Gang": "gang_limit",
-                    "Gangs-LD": "female_gang_limit",
-                    "Family": "family_limit",
-                }.get(gang["type"])
-                if limit_column:
-                    limit = item[limit_column]
-                    if limit is not None:
-                        current = db.execute(
-                            """
-                            SELECT COUNT(*) FROM welfare_requests
-                            WHERE gangAbbreviation = ? AND welfareItem = ? AND requestType = 'receive'
-                            AND status NOT IN ('เอาออกแล้ว', 'เอาสวัสดิการออกแล้ว')
-                            """,
-                            (gang_abbreviation, welfare_item),
-                        ).fetchone()[0]
-                        if current >= limit:
-                            return jsonify({
-                                "success": False,
-                                "message": f"❌ แก๊งประเภท {gang['type']} ครอบครอง {welfare_item} ได้ไม่เกิน {limit} อัน"
-                            }), 409
+                # Prefer per-gang limit; fall back to legacy type-based default if not configured
+                gwi = db.execute(
+                    """
+                    SELECT item_limit FROM gang_welfare_items
+                    WHERE gangId = ? AND welfareItemId = ? AND active = 1
+                    """,
+                    (gang["id"], item["id"]),
+                ).fetchone()
+                if gwi and gwi["item_limit"] is not None:
+                    limit = gwi["item_limit"]
+                else:
+                    limit_column = {
+                        "Gang": "gang_limit",
+                        "Gangs-LD": "female_gang_limit",
+                        "Family": "family_limit",
+                    }.get(gang["type"])
+                    limit = item[limit_column] if limit_column else None
+                if limit is not None:
+                    current = db.execute(
+                        """
+                        SELECT COUNT(*) FROM welfare_requests
+                        WHERE gangAbbreviation = ? AND welfareItem = ? AND requestType = 'receive'
+                        AND status NOT IN ('เอาออกแล้ว', 'เอาสวัสดิการออกแล้ว')
+                        """,
+                        (gang_abbreviation, welfare_item),
+                    ).fetchone()[0]
+                    if current >= limit:
+                        return jsonify({
+                            "success": False,
+                            "message": f"❌ แก๊ง {gang['fullName']} ครอบครอง {welfare_item} ได้ไม่เกิน {limit} อัน"
+                        }), 409
 
         db.execute(
             """
@@ -1477,10 +1487,21 @@ def create_welfare_item():
     family_limit = parse_optional_int(data.get("family_limit"))
     db = get_db()
     try:
-        db.execute(
+        cursor = db.execute(
             "INSERT INTO welfare_items (name, type, gang_limit, female_gang_limit, family_limit, active, createdAt) VALUES (?, ?, ?, ?, ?, 1, ?)",
             (name, item_type, gang_limit, female_gang_limit, family_limit, now_thai()),
         )
+        item_id = cursor.lastrowid
+        db.commit()
+
+        # Seed per-gang entries for all existing gangs with no limit (active=1)
+        created_at = now_thai()
+        gangs = db.execute("SELECT id FROM gangs").fetchall()
+        for gang in gangs:
+            db.execute(
+                "INSERT OR IGNORE INTO gang_welfare_items (gangId, welfareItemId, item_limit, active, createdAt) VALUES (?, ?, ?, 1, ?)",
+                (gang["id"], item_id, None, created_at),
+            )
         db.commit()
         _log_action(db)
         return jsonify({"success": True, "message": "✅ เพิ่มรายการสวัสดิการสำเร็จ"})
@@ -1546,6 +1567,74 @@ def delete_welfare_item(item_id):
         return jsonify({"success": True, "message": "🗑️ ลบรายการสวัสดิการสำเร็จ"})
     except Exception as e:
         return jsonify({"success": False, "message": "❌ ไม่สามารถลบรายการสวัสดิการได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare-items/<int:item_id>/gangs", methods=["GET"])
+def get_welfare_item_gang_limits(item_id):
+    """Return all approved gangs with their per-gang limit for a welfare item."""
+    db = get_db()
+    try:
+        rows = db.execute(
+            """
+            SELECT g.id, g.fullName, g.abbreviation, g.type, gwi.item_limit, gwi.active
+            FROM gangs g
+            LEFT JOIN gang_welfare_items gwi ON gwi.gangId = g.id AND gwi.welfareItemId = ?
+            WHERE g.status = 'approved'
+            ORDER BY g.fullName ASC
+            """,
+            (item_id,),
+        ).fetchall()
+        return jsonify({"success": True, "gangs": [row_to_dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "gangs": [], "message": "❌ ไม่สามารถดึงข้อมูลแก๊งได้"}), 500
+    finally:
+        db.close()
+
+
+@app.route("/api/welfare-items/<int:item_id>/gangs", methods=["POST"])
+def update_welfare_item_gang_limits(item_id):
+    """Update per-gang limits for a welfare item. Payload: { gangLimits: [{gangId, item_limit, active}] }"""
+    data = request.get_json(silent=True) or {}
+    gang_limits = data.get("gangLimits") or []
+    db = get_db()
+    try:
+        created_at = now_thai()
+        for entry in gang_limits:
+            gang_id = entry.get("gangId")
+            limit = entry.get("item_limit")
+            active = entry.get("active", 1)
+            if gang_id is None:
+                continue
+            # Normalize empty/invalid limits to NULL (unlimited)
+            if limit is not None:
+                try:
+                    limit = int(limit)
+                    if limit < 0:
+                        limit = None
+                except (ValueError, TypeError):
+                    limit = None
+            existing = db.execute(
+                "SELECT id FROM gang_welfare_items WHERE gangId = ? AND welfareItemId = ?",
+                (gang_id, item_id),
+            ).fetchone()
+            if existing:
+                db.execute(
+                    "UPDATE gang_welfare_items SET item_limit = ?, active = ?, createdAt = ? WHERE id = ?",
+                    (limit, 1 if active else 0, created_at, existing["id"]),
+                )
+            else:
+                db.execute(
+                    "INSERT INTO gang_welfare_items (gangId, welfareItemId, item_limit, active, createdAt) VALUES (?, ?, ?, ?, ?)",
+                    (gang_id, item_id, limit, 1 if active else 0, created_at),
+                )
+        db.commit()
+        _log_action(db, action="update_welfare_item_gang_limits", target_type="welfare_item", target_id=item_id, details={"gangLimits": gang_limits})
+        return jsonify({"success": True, "message": "✅ บันทึกการกำหนดสวัสดิการรายแก๊งสำเร็จ"})
+    except Exception as e:
+        logger.error(f"❌ บันทึกสวัสดิการรายแก๊งล้มเหลว: {e}")
+        return jsonify({"success": False, "message": "❌ ไม่สามารถบันทึกสวัสดิการรายแก๊งได้"}), 500
     finally:
         db.close()
 
@@ -1693,6 +1782,10 @@ def update_council_user(id):
             dup = db.execute("SELECT id FROM council_users WHERE username = ? AND id != ?", (username, id)).fetchone()
             if dup:
                 return jsonify({"success": False, "message": "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว"}), 409
+        if name and name != existing["name"]:
+            dup_name = db.execute("SELECT id FROM council_users WHERE name = ? AND id != ?", (name, id)).fetchone()
+            if dup_name:
+                return jsonify({"success": False, "message": "❌ ชื่อนี้มีอยู่ในระบบสภาแล้ว"}), 409
         fields = []
         values = []
         if name:

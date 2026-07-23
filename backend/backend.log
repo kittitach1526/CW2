@@ -339,3 +339,108 @@
 2026-07-23 21:31:57.101 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"council": {"createdAt": "2026-07-23 14:31:36", "id": 1965, "name": "Root Council", "password": "***", "status": "อนุมัติ", "username": "root"}, "message": "🎉 เข้าสู่ระบบสภากลางสำเร็จ!", "success": true}
 2026-07-23 21:31:57.108 | INFO     | __main__:_log_action:465 - 📝 root (system) login เมื่อ 2026-07-23 14:31:57
 2026-07-23 21:31:57.108 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/council/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}, "response_status": 200, "response": {"council": {"createdAt": "2026-07-23 14:31:36", "id": 1965, "name": "Root Council", "password": "***", "status": "อนุมัติ", "username": "root"}, "message": "🎉 เข้าสู่ระบบสภากลางสำเร็จ!", "success": true}}
+2026-07-23 21:52:21.896 | INFO     | __main__:<module>:2209 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 21:52:21.929 | INFO     | __main__:<module>:2211 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 21:52:21.929 | INFO     | __main__:<module>:2213 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 21:52:38.411 | INFO     | __main__:<module>:2209 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 21:52:38.443 | INFO     | __main__:<module>:2211 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 21:52:38.443 | INFO     | __main__:<module>:2213 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 21:52:58.910 | INFO     | __main__:<module>:2219 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 21:52:58.933 | INFO     | __main__:<module>:2221 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 21:52:58.933 | INFO     | __main__:<module>:2223 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 21:53:30.388 | INFO     | __main__:<module>:2287 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 21:53:30.409 | INFO     | __main__:<module>:2289 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 21:53:30.410 | INFO     | __main__:<module>:2291 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 21:57:11.416 | INFO     | __main__:<module>:2298 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 21:57:11.442 | INFO     | __main__:<module>:2300 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 21:57:11.442 | INFO     | __main__:<module>:2302 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 21:57:45.628 | INFO     | app:log_before_request:28 - ➡️ รับคำขอ POST /api/welfare-items/5/gangs
+2026-07-23 21:57:45.628 | INFO     | app:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/welfare-items/5/gangs", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"gangLimits": [{"active": true, "gangId": 8, "item_limit": 2}, {"active": false, "gangId": 9, "item_limit": null}]}}
+2026-07-23 21:57:45.653 | INFO     | app:_log_action:465 - 📝 system (system) update_welfare_item_gang_limits #5 เมื่อ 2026-07-23 14:57:45
+2026-07-23 21:57:45.653 | INFO     | app:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/welfare-items/5/gangs", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"gangLimits": [{"active": true, "gangId": 8, "item_limit": 2}, {"active": false, "gangId": 9, "item_limit": null}]}}, "gangLimits": [{"active": true, "gangId": 8, "item_limit": 2}, {"active": false, "gangId": 9, "item_limit": null}]}
+2026-07-23 21:57:45.654 | INFO     | app:log_after_request:48 - ⬅️ ตอบกลับ POST /api/welfare-items/5/gangs สถานะ 200
+2026-07-23 21:57:45.654 | INFO     | app:log_after_request:50 - 📤 ข้อมูลออก: {"message": "✅ บันทึกการกำหนดสวัสดิการรายแก๊งสำเร็จ", "success": true}
+2026-07-23 21:57:53.040 | INFO     | app:log_before_request:28 - ➡️ รับคำขอ POST /api/welfare
+2026-07-23 21:57:53.041 | INFO     | app:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/welfare", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"discordId": "test0", "gangAbbreviation": "CCC", "gangName": "Council", "requestName": "Test0", "requestType": "receive", "welfareItem": "test"}}
+2026-07-23 21:57:53.067 | INFO     | app:_log_action:465 - 📝 Test0 (system) ส่งคำขอสวัสดิการ #12 (Council) ประเภท receive | สิ่งของ test เมื่อ 2026-07-23 14:57:53
+2026-07-23 21:57:53.067 | INFO     | app:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/welfare", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"discordId": "test0", "gangAbbreviation": "CCC", "gangName": "Council", "requestName": "Test0", "requestType": "receive", "welfareItem": "test"}}, "discordId": "test0", "gangAbbreviation": "CCC", "gangName": "Council", "requestName": "Test0", "requestType": "receive", "welfareItem": "test"}
+2026-07-23 21:57:53.068 | INFO     | app:log_after_request:48 - ⬅️ ตอบกลับ POST /api/welfare สถานะ 201
+2026-07-23 21:57:53.068 | INFO     | app:log_after_request:50 - 📤 ข้อมูลออก: {"message": "📦 ส่งคำขอรับสวัสดิการไปยังระบบสภากลางเรียบร้อยแล้ว!", "success": true}
+2026-07-23 21:57:53.069 | INFO     | app:log_before_request:28 - ➡️ รับคำขอ POST /api/welfare
+2026-07-23 21:57:53.069 | INFO     | app:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/welfare", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"discordId": "test1", "gangAbbreviation": "CCC", "gangName": "Council", "requestName": "Test1", "requestType": "receive", "welfareItem": "test"}}
+2026-07-23 21:57:53.090 | INFO     | app:_log_action:465 - 📝 Test1 (system) ส่งคำขอสวัสดิการ #13 (Council) ประเภท receive | สิ่งของ test เมื่อ 2026-07-23 14:57:53
+2026-07-23 21:57:53.090 | INFO     | app:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/welfare", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"discordId": "test1", "gangAbbreviation": "CCC", "gangName": "Council", "requestName": "Test1", "requestType": "receive", "welfareItem": "test"}}, "discordId": "test1", "gangAbbreviation": "CCC", "gangName": "Council", "requestName": "Test1", "requestType": "receive", "welfareItem": "test"}
+2026-07-23 21:57:53.091 | INFO     | app:log_after_request:48 - ⬅️ ตอบกลับ POST /api/welfare สถานะ 201
+2026-07-23 21:57:53.091 | INFO     | app:log_after_request:50 - 📤 ข้อมูลออก: {"message": "📦 ส่งคำขอรับสวัสดิการไปยังระบบสภากลางเรียบร้อยแล้ว!", "success": true}
+2026-07-23 21:57:53.092 | INFO     | app:log_before_request:28 - ➡️ รับคำขอ POST /api/welfare
+2026-07-23 21:57:53.092 | INFO     | app:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/welfare", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"discordId": "test2", "gangAbbreviation": "CCC", "gangName": "Council", "requestName": "Test2", "requestType": "receive", "welfareItem": "test"}}
+2026-07-23 21:57:53.095 | INFO     | app:log_after_request:48 - ⬅️ ตอบกลับ POST /api/welfare สถานะ 409
+2026-07-23 21:57:53.095 | INFO     | app:log_after_request:50 - 📤 ข้อมูลออก: {"message": "❌ แก๊ง Council ครอบครอง test ได้ไม่เกิน 2 อัน", "success": false}
+2026-07-23 21:57:53.109 | INFO     | app:_log_action:465 - 📝 Test2 (system) welfare Council เมื่อ 2026-07-23 14:57:53
+2026-07-23 21:57:53.109 | INFO     | app:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/welfare", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"discordId": "test2", "gangAbbreviation": "CCC", "gangName": "Council", "requestName": "Test2", "requestType": "receive", "welfareItem": "test"}}, "response_status": 409, "response": {"message": "❌ แก๊ง Council ครอบครอง test ได้ไม่เกิน 2 อัน", "success": false}}
+2026-07-23 22:38:31.780 | INFO     | __main__:<module>:2298 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 22:38:31.809 | INFO     | __main__:<module>:2300 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 22:38:31.809 | INFO     | __main__:<module>:2302 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 22:38:32.246 | INFO     | __main__:<module>:2298 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 22:38:32.273 | INFO     | __main__:<module>:2300 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 22:38:32.275 | INFO     | __main__:<module>:2302 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 22:47:19.948 | INFO     | __main__:<module>:2298 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 22:47:19.971 | INFO     | __main__:<module>:2300 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 22:47:19.971 | INFO     | __main__:<module>:2302 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 22:47:27.513 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 22:47:27.532 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 22:47:27.533 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 22:47:57.224 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 22:47:57.251 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 22:47:57.252 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 22:48:03.928 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 22:48:03.949 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 22:48:03.949 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 22:48:12.600 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 22:48:12.622 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 22:48:12.622 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 22:48:36.403 | INFO     | app:log_before_request:28 - ➡️ รับคำขอ POST /api/council
+2026-07-23 22:48:36.404 | INFO     | app:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/council", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"name": "Mapao Yakdonjoobbabdoublll", "password": "***", "username": "newusername"}}
+2026-07-23 22:48:36.406 | INFO     | app:log_after_request:48 - ⬅️ ตอบกลับ POST /api/council สถานะ 409
+2026-07-23 22:48:36.406 | INFO     | app:log_after_request:50 - 📤 ข้อมูลออก: {"message": "❌ ชื่อนี้มีอยู่ในระบบสภาแล้ว", "success": false}
+2026-07-23 22:48:36.429 | INFO     | app:_log_action:465 - 📝 newusername (system) council Mapao Yakdonjoobbabdoublll เมื่อ 2026-07-23 15:48:36
+2026-07-23 22:48:36.429 | INFO     | app:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/council", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"name": "Mapao Yakdonjoobbabdoublll", "password": "***", "username": "newusername"}}, "response_status": 409, "response": {"message": "❌ ชื่อนี้มีอยู่ในระบบสภาแล้ว", "success": false}}
+2026-07-23 22:48:36.432 | INFO     | app:log_before_request:28 - ➡️ รับคำขอ POST /api/council
+2026-07-23 22:48:36.432 | INFO     | app:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/council", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"name": "New Name", "password": "***", "username": "pao"}}
+2026-07-23 22:48:36.435 | INFO     | app:log_after_request:48 - ⬅️ ตอบกลับ POST /api/council สถานะ 409
+2026-07-23 22:48:36.435 | INFO     | app:log_after_request:50 - 📤 ข้อมูลออก: {"message": "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบสภาแล้ว", "success": false}
+2026-07-23 22:48:36.443 | INFO     | app:_log_action:465 - 📝 pao (system) council New Name เมื่อ 2026-07-23 15:48:36
+2026-07-23 22:48:36.443 | INFO     | app:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/council", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"name": "New Name", "password": "***", "username": "pao"}}, "response_status": 409, "response": {"message": "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบสภาแล้ว", "success": false}}
+2026-07-23 22:48:36.444 | INFO     | app:log_before_request:28 - ➡️ รับคำขอ PATCH /api/council/37
+2026-07-23 22:48:36.445 | INFO     | app:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "PATCH", "path": "/api/council/37", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"name": "Nongfxryou YGz"}}
+2026-07-23 22:48:36.446 | INFO     | app:log_after_request:48 - ⬅️ ตอบกลับ PATCH /api/council/37 สถานะ 409
+2026-07-23 22:48:36.447 | INFO     | app:log_after_request:50 - 📤 ข้อมูลออก: {"message": "❌ ชื่อนี้มีอยู่ในระบบสภาแล้ว", "success": false}
+2026-07-23 22:48:36.454 | INFO     | app:_log_action:465 - 📝 Nongfxryou YGz (system) council #37 (Nongfxryou YGz) เมื่อ 2026-07-23 15:48:36
+2026-07-23 22:48:36.454 | INFO     | app:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "PATCH", "path": "/api/council/37", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"name": "Nongfxryou YGz"}}, "response_status": 409, "response": {"message": "❌ ชื่อนี้มีอยู่ในระบบสภาแล้ว", "success": false}}
+2026-07-23 23:07:24.054 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 23:07:24.083 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 23:07:24.084 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 23:07:42.422 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 23:07:42.460 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 23:07:42.461 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 23:07:52.634 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 23:07:52.653 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 23:07:52.653 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 23:09:28.831 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 23:09:28.848 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 23:09:28.849 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 23:09:39.474 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 23:09:39.491 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 23:09:39.491 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 23:11:25.807 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 23:11:25.823 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 23:11:25.823 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 23:11:26.287 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 23:11:26.306 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 23:11:26.306 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 23:34:54.635 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 23:34:54.656 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 23:34:54.657 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-23 23:34:55.306 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-23 23:34:55.327 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-23 23:34:55.327 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
