@@ -1,14 +1,95 @@
 import json
 import os
 import sqlite3
+import sys
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from loguru import logger
 
 from database import get_db, init_db
 
+# ตั้งค่า loguru: เก็บ log ในไฟล์ backend.log หมุนเวียนทุกวัน พร้อมแสดงใน console
+logger.remove()
+logger.add("backend.log", rotation="1 day", retention="120 days", encoding="utf-8", level="INFO")
+logger.add(sys.stderr, level="INFO")
+
 app = Flask(__name__)
 CORS(app)
+
+
+@app.before_request
+def log_before_request():
+    """Log incoming data-affecting requests (POST/PATCH/PUT/DELETE) to loguru."""
+    if request.method not in ('POST', 'PATCH', 'PUT', 'DELETE'):
+        return
+    try:
+        request_data = _safe_request_data()
+        logger.info(f"➡️ รับคำขอ {request.method} {request.path}")
+        logger.info(f"📥 ข้อมูลเข้า: {json.dumps(request_data, ensure_ascii=False)}")
+    except Exception as e:
+        logger.error(f"❌ บันทึกคำขอล้มเหลว: {e}")
+
+
+@app.after_request
+def log_after_request(response):
+    """Log data-affecting responses (POST/PATCH/PUT/DELETE) to loguru and system_logs if not already logged."""
+    if request.method not in ('POST', 'PATCH', 'PUT', 'DELETE'):
+        return response
+    try:
+        response_data = response.get_json(silent=True)
+        if isinstance(response_data, dict):
+            response_data = _mask_passwords_in_dict(response_data)
+        elif isinstance(response_data, list):
+            response_data = [_mask_passwords_in_dict(item) if isinstance(item, dict) else item for item in response_data]
+        response_preview = json.dumps(response_data, ensure_ascii=False) if response_data else None
+        if response_preview and len(response_preview) > 1000:
+            response_preview = response_preview[:1000] + "... (truncated)"
+        logger.info(f"⬅️ ตอบกลับ {request.method} {request.path} สถานะ {response.status_code}")
+        if response_preview:
+            logger.info(f"📤 ข้อมูลออก: {response_preview}")
+
+        # Log to system_logs for endpoints that did not call _log_action
+        from flask import g
+        if not getattr(g, 'log_action_called', False) and request.path not in ('/api/health', '/'):
+            db = get_db()
+            try:
+                path_parts = [p for p in request.path.strip('/').split('/') if p]
+                # Derive action from path, e.g. 'api/gangs/login' -> 'login_gang'
+                action = path_parts[-1] if path_parts else 'request'
+                if action.isdigit():
+                    action = path_parts[-2] if len(path_parts) > 1 else 'request'
+
+                # Derive target id from URL numeric segment
+                target_id = None
+                for part in path_parts:
+                    if part.isdigit():
+                        target_id = int(part)
+                        break
+
+                # Derive target type from URL resource segment
+                target_type = path_parts[1] if len(path_parts) > 1 else 'system'
+                if target_type.isdigit():
+                    target_type = 'system'
+
+                data = request.get_json(silent=True) or {}
+                actor, actor_role = _actor_from_data(data, 'system', 'system')
+
+                _log_action(
+                    db,
+                    action=action,
+                    target_type=target_type,
+                    target_id=target_id,
+                    details={"response_status": response.status_code, "response": response_data},
+                    default_actor=actor,
+                    default_role=actor_role,
+                )
+            finally:
+                db.close()
+    except Exception as e:
+        logger.error(f"❌ บันทึกการตอบกลับล้มเหลว: {e}")
+    return response
+
 
 ROOT_USERNAME = os.environ.get("ROOT_USERNAME", "root")
 ROOT_PASSWORD = os.environ.get("ROOT_PASSWORD", "p@ssw0rd")
@@ -47,6 +128,64 @@ def _normalize(value):
     if value is None:
         return ""
     return str(value).strip().lower()
+
+
+def _safe_request_data():
+    """Capture all request data for logging, masking sensitive fields."""
+    from flask import request
+    result = {
+        "method": request.method,
+        "path": request.path,
+        "query": dict(request.args) if request.args else {},
+        "remote_addr": request.remote_addr,
+        "user_agent": request.user_agent.string if request.user_agent else None,
+    }
+
+    try:
+        if request.is_json:
+            data = request.get_json(silent=True) or {}
+        else:
+            data = request.form.to_dict() if request.form else {}
+    except Exception:
+        data = {}
+
+    safe_data = {}
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(key, str) and any(p in key.lower() for p in ("password", "รหัสผ่าน")):
+                safe_data[key] = "***"
+            else:
+                safe_data[key] = value
+    result["data"] = safe_data
+    return result
+
+
+def _mask_passwords_in_dict(d):
+    """Recursively mask password values in a dict."""
+    if not isinstance(d, dict):
+        return d
+    masked = {}
+    for key, value in d.items():
+        if isinstance(key, str) and any(p in key.lower() for p in ("password", "รหัสผ่าน")):
+            masked[key] = "***"
+        elif isinstance(value, dict):
+            masked[key] = _mask_passwords_in_dict(value)
+        elif isinstance(value, list):
+            masked[key] = [_mask_passwords_in_dict(v) if isinstance(v, dict) else v for v in value]
+        else:
+            masked[key] = value
+    return masked
+
+
+def _merge_request_details(existing_details):
+    """Merge existing details with full request data."""
+    if not isinstance(existing_details, dict):
+        existing_details = {} if existing_details is None else {"value": existing_details}
+    request_data = _safe_request_data()
+    merged = {"request": request_data}
+    if existing_details:
+        merged.update(existing_details)
+    return _mask_passwords_in_dict(merged)
 
 
 def _active_welfare_for_person(db, gang_abbreviation, name, discord, phone=None):
@@ -214,6 +353,9 @@ def _build_log_description(action, actor, actor_role, target_type, target_id, ta
 def _log_action(db, action=None, target_type=None, target_id=None, target_name=None, details=None, default_actor='system', default_role='system'):
     """Insert a system log row. Try to derive context from the caller when not provided."""
     try:
+        from flask import g
+        g.log_action_called = True
+
         import inspect
         frame = inspect.currentframe()
         caller = frame.f_back if frame else None
@@ -291,10 +433,13 @@ def _log_action(db, action=None, target_type=None, target_id=None, target_name=N
             details = {}
             if isinstance(data, dict):
                 for key, value in data.items():
-                    if key in ('password', 'newPassword', 'passwordConfirm'):
-                        continue
-                    if value is not None:
+                    if isinstance(key, str) and any(p in key.lower() for p in ("password", "รหัสผ่าน")):
+                        details[key] = "***"
+                    elif value is not None:
                         details[key] = value
+
+        # Merge with full request data (method, path, query, headers, etc.)
+        details = _merge_request_details(details)
 
         created_at = now_thai()
         description = _build_log_description(action, actor, actor_role, target_type, target_id, target_name, details, created_at)
@@ -317,8 +462,10 @@ def _log_action(db, action=None, target_type=None, target_id=None, target_name=N
             ),
         )
         db.commit()
+        logger.info(f"📝 {description}")
+        logger.info(f"📦 รายละเอียด: {json.dumps(details, ensure_ascii=False)}")
     except Exception as e:
-        print("[log_action error]", e)
+        logger.error(f"❌ บันทึก system log ล้มเหลว: {e}")
 
 
 @app.route("/api/health", methods=["GET"])
@@ -870,7 +1017,7 @@ def request_pause_gang():
         _log_action(db)
         return jsonify({"success": True, "message": "⏸️ ส่งคำขอพักแก๊งไปยังสภากลางแล้ว กรุณารออนุมัติ"})
     except Exception as e:
-        print("[pause request error]", e)
+        logger.error(f"❌ ส่งคำขอพักแก๊งล้มเหลว: {e}")
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในระบบฐานข้อมูล"}), 500
     finally:
         db.close()
@@ -950,7 +1097,7 @@ def approve_pause_request(id):
         _log_action(db)
         return jsonify({"success": True, "message": "✅ อนุมัติคำขอพักแก๊งแล้ว สถานะแก๊งเปลี่ยนเป็น 'พัก'"})
     except Exception as e:
-        print("[pause approve error]", e)
+        logger.error(f"❌ อนุมัติคำขอพักแก๊งล้มเหลว: {e}")
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการอนุมัติคำขอพักแก๊ง"}), 500
     finally:
         db.close()
@@ -996,7 +1143,7 @@ def report_pause_request(id):
         _log_action(db)
         return jsonify({"success": True, "message": "✅ รายงานตัวแล้ว สถานะแก๊งกลับเป็นอนุมัติ"})
     except Exception as e:
-        print("[pause report error]", e)
+        logger.error(f"❌ รายงานตัวหลังพักแก๊งล้มเหลว: {e}")
         return jsonify({"success": False, "message": "❌ เกิดข้อผิดพลาดในการรายงานตัว"}), 500
     finally:
         db.close()
@@ -1454,7 +1601,7 @@ def get_approved_council_names():
     db = get_db()
     try:
         rows = db.execute(
-            "SELECT name FROM council_users WHERE status = 'อนุมัติ' ORDER BY name"
+            "SELECT DISTINCT name FROM council_users WHERE status = 'อนุมัติ' ORDER BY name"
         ).fetchall()
         return jsonify({"success": True, "names": [r["name"] for r in rows]})
     except Exception as e:
@@ -1479,6 +1626,12 @@ def create_council_user():
         ).fetchone()
         if existing:
             return jsonify({"success": False, "message": "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบสภาแล้ว"}), 409
+
+        existing_name = db.execute(
+            "SELECT id FROM council_users WHERE name = ?", (name,)
+        ).fetchone()
+        if existing_name:
+            return jsonify({"success": False, "message": "❌ ชื่อนี้มีอยู่ในระบบสภาแล้ว"}), 409
 
         db.execute(
             "INSERT INTO council_users (name, username, password, status, createdAt) VALUES (?, ?, ?, 'อนุมัติ', ?)",
@@ -1959,6 +2112,36 @@ def get_welfare_remaining(gang_abbreviation):
 # ---------------------------------------------------------------------------
 # System Logs
 # ---------------------------------------------------------------------------
+@app.route("/api/frontend-logs", methods=["POST"])
+def create_frontend_log():
+    """Receive frontend action logs (menu/tab/button interactions) and store them."""
+    data = request.get_json(silent=True) or {}
+    actor = (data.get("actor") or "anonymous").strip() or "anonymous"
+    actor_role = (data.get("actorRole") or "user").strip() or "user"
+    action = (data.get("action") or "frontend_action").strip() or "frontend_action"
+    target_type = (data.get("targetType") or "frontend").strip() or "frontend"
+    target_name = data.get("targetName") or None
+    details = data.get("details") or {}
+
+    db = get_db()
+    try:
+        _log_action(
+            db,
+            action=action,
+            target_type=target_type,
+            target_name=target_name,
+            details=details,
+            default_actor=actor,
+            default_role=actor_role,
+        )
+        return jsonify({"success": True, "message": "✅ บันทึก log frontend เรียบร้อย"}), 201
+    except Exception as e:
+        logger.error(f"❌ บันทึก frontend log ล้มเหลว: {e}")
+        return jsonify({"success": False, "message": "❌ ไม่สามารถบันทึก log frontend ได้"}), 500
+    finally:
+        db.close()
+
+
 @app.route("/api/logs", methods=["GET"])
 def get_system_logs():
     """Return system action logs, optionally filtered and limited."""
@@ -2023,6 +2206,9 @@ def get_root():
     return jsonify({"success":"API START !"})
 
 if __name__ == "__main__":
+    logger.info("🚀 ระบบ backend กำลังเริ่มต้นการทำงาน")
     init_db()
+    logger.info("✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น")
     port = int(os.environ.get("PORT", 4000))
+    logger.info(f"🌐 กำลังเปิดพอร์ต {port}")
     app.run(host="0.0.0.0", port=port, debug=True)

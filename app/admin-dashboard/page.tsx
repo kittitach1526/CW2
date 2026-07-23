@@ -9,6 +9,7 @@ import {
   getAllUniformFiles,
   updateUniformStatus,
   getLeaveRequests,
+  logFrontendAction,
 } from "../register";
 import { useStatusModal } from "../components/StatusModalProvider";
 
@@ -140,6 +141,7 @@ export default function AdminDashboard() {
   }, [activeTab, adminData]);
 
   const handleLogout = () => {
+    logFrontendAction("ออกจากระบบ", "admin-dashboard", undefined, currentActor, currentActorRole, "admin_dashboard");
     localStorage.removeItem("currentAdmin");
     router.push("/");
   };

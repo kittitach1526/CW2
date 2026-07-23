@@ -25,6 +25,7 @@ import {
   createWelfareItem,
   updateWelfareItem,
   deleteWelfareItem,
+  logFrontendAction,
 } from "../register";
 import Modal from "../components/Modal";
 import { useStatusModal } from "../components/StatusModalProvider";
@@ -170,6 +171,7 @@ export default function CouncilAdminDashboard() {
   }, [activeTab]);
 
   const handleLogout = () => {
+    logFrontendAction("ออกจากระบบ", "council-dashboard", undefined, currentActor, currentActorRole, "council_dashboard");
     localStorage.removeItem("currentCouncil");
     router.push("/");
   };
@@ -432,7 +434,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
     { id: "rejected_gangs", label: "แก๊งไม่ได้รับอนุมัติ", icon: "❌" },
     { id: "welfare_by_gang", label: "สวัสดิการตามแก๊ง", icon: "🎁" },
     { id: "welfare_items", label: "จัดการรายการสวัสดิการ", icon: "📦" },
-    { id: "approve_logs", label: "Logs", icon: "📝" },
+    { id: "approve_logs", label: "ประวัติการกระทำ", icon: "📝" },
   ] as const;
 
   const pendingGangCount = gangsList.filter((g) => g.status === "pending" || g.status === "รอยุบ").length;
@@ -1353,7 +1355,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
               {activeTab === "approve_logs" && (
                 <div className="flex flex-col w-full">
                   <div className="p-5 border-b border-white/[0.06] bg-white/[0.01] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <h2 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">📝 Logs การกระทำ</h2>
+                    <h2 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">📝 ประวัติการกระทำ</h2>
                     <span className="text-xs text-zinc-500">แสดง {systemLogs.length} รายการ</span>
                   </div>
                   <div className="overflow-x-auto">
@@ -1376,12 +1378,24 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                                 <div className="font-medium text-white">{log.actor || "-"}</div>
                                 <div className="text-[10px] text-zinc-500 mt-0.5">{log.actorRole || "-"}</div>
                               </td>
-                              <td className="px-6 py-4 text-zinc-300 align-top" title={log.details ? JSON.stringify(log.details) : ""}>
-                                {log.description || `${log.action} ${log.targetType || ""} ${log.targetId ? `#${log.targetId}` : ""}`.trim()}
-                                {log.details && (
-                                  <div className="text-[10px] text-zinc-500 mt-1 font-mono truncate max-w-xl">
-                                    {JSON.stringify(log.details)}
+                              <td className="px-6 py-4 text-zinc-300 align-top">
+                                <div className="mb-1">{log.description || `${log.action} ${log.targetType || ""} ${log.targetId ? `#${log.targetId}` : ""}`.trim()}</div>
+                                {log.details && typeof log.details === "object" && (
+                                  <div className="text-[10px] text-zinc-500 mt-1 font-mono">
+                                    {log.details.request && (
+                                      <span className="inline-block mr-3">
+                                        {log.details.request.method} {log.details.request.path}
+                                      </span>
+                                    )}
+                                    {log.details.response_status !== undefined && (
+                                      <span className="inline-block mr-3">สถานะ {log.details.response_status}</span>
+                                    )}
                                   </div>
+                                )}
+                                {log.details && (
+                                  <pre className="text-[10px] text-zinc-500 mt-1 font-mono bg-zinc-950/30 p-2 rounded max-h-32 overflow-auto max-w-2xl">
+{JSON.stringify(log.details, null, 2)}
+                                  </pre>
                                 )}
                               </td>
                             </tr>

@@ -17,6 +17,7 @@ import {
   getPauseRequestByGang,
   getCouncilNames,
   getWelfareItems,
+  logFrontendAction,
 } from "../register";
 import ImageUpload from "../components/ImageUpload";
 import { useStatusModal } from "../components/StatusModalProvider";
@@ -298,6 +299,10 @@ export default function GangDashboard() {
   }, [gangData?.id]);
 
   const handleLogout = () => {
+    if (gangData) {
+      const actor = gangData.fullName || gangData.abbreviation || "แก๊ง";
+      logFrontendAction("ออกจากระบบ", "gang-dashboard", undefined, actor, "gang", "gang_dashboard");
+    }
     localStorage.removeItem("currentGang");
     router.push("/");
   };
@@ -1000,8 +1005,8 @@ export default function GangDashboard() {
                     required
                   >
                     <option value="">-- เลือกสภา --</option>
-                    {councilNames.map((name) => (
-                      <option key={name} value={name}>{name}</option>
+                    {councilNames.map((name, index) => (
+                      <option key={`${name}-${index}`} value={name}>{name}</option>
                     ))}
                   </select>
                 </div>
@@ -1346,8 +1351,8 @@ export default function GangDashboard() {
                     required
                   >
                     <option value="">-- เลือกสภา --</option>
-                    {councilNames.map((name) => (
-                      <option key={name} value={name}>{name}</option>
+                    {councilNames.map((name, index) => (
+                      <option key={`${name}-${index}`} value={name}>{name}</option>
                     ))}
                   </select>
                 </div>
@@ -1480,8 +1485,8 @@ export default function GangDashboard() {
                     required
                   >
                     <option value="">-- เลือกสภา --</option>
-                    {councilNames.map((name) => (
-                      <option key={name} value={name}>{name}</option>
+                    {councilNames.map((name, index) => (
+                      <option key={`${name}-${index}`} value={name}>{name}</option>
                     ))}
                   </select>
                 </div>
@@ -1567,8 +1572,8 @@ export default function GangDashboard() {
                     required
                   >
                     <option value="">-- เลือกผู้อนุมัติ --</option>
-                    {councilNames.map((name) => (
-                      <option key={name} value={name}>{name}</option>
+                    {councilNames.map((name, index) => (
+                      <option key={`${name}-${index}`} value={name}>{name}</option>
                     ))}
                   </select>
                 </div>
@@ -1786,8 +1791,8 @@ export default function GangDashboard() {
                       required
                     >
                       <option value="">-- เลือกสภา --</option>
-                      {councilNames.map((name) => (
-                        <option key={name} value={name}>{name}</option>
+                      {councilNames.map((name, index) => (
+                        <option key={`${name}-${index}`} value={name}>{name}</option>
                       ))}
                     </select>
                   </div>
@@ -1843,8 +1848,8 @@ export default function GangDashboard() {
                       required
                     >
                       <option value="">-- เลือกสภา --</option>
-                      {councilNames.map((name) => (
-                        <option key={name} value={name}>{name}</option>
+                      {councilNames.map((name, index) => (
+                        <option key={`${name}-${index}`} value={name}>{name}</option>
                       ))}
                     </select>
                   </div>
