@@ -138,51 +138,33 @@ export default function Home() {
             </div>
 
             {/* ─── โซนข้อมูลหัวหน้าแก๊ง ─── */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-zinc-200">หัวหน้า (Leader)</label>
-              <input type="text" name="leader" placeholder="ชื่อหัวหน้ากลุ่ม" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" required />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-zinc-200">เลขดิสคอร์ดหัวหน้า (Leader Discord ID)</label>
-              <input type="text" name="leaderDiscord" placeholder="เช่น 3948571029485761" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" required />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-zinc-200">เบอร์โทรหัวหน้า (Leader Phone)</label>
-              <input type="tel" name="leaderPhone" placeholder="เช่น 0812345678" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" required />
+            <div className="flex flex-col gap-2 sm:col-span-2">
+              <label className="text-sm font-medium text-zinc-200">หัวหน้าแก๊ง (Leader)</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input type="text" name="leader" placeholder="ชื่อหัวหน้ากลุ่ม" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" required />
+                <input type="text" name="leaderDiscord" placeholder="Discord ID" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" required />
+                <input type="tel" name="leaderPhone" placeholder="เบอร์โทร" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" required />
+              </div>
             </div>
 
             {/* ─── โซนข้อมูลรองหัวหน้าคนที่ 1 ─── */}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 sm:col-span-2">
               <label className="text-sm font-medium text-zinc-200">รองหัวหน้า 1</label>
-              <input type="text" name="coLeader1" placeholder="ชื่อรองหัวหน้าคนที่ 1" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-zinc-200">เลขดิสคอร์ดรอง 1 (Co-Leader 1 Discord ID)</label>
-              <input type="text" name="coLeader1Discord" placeholder="เช่น 3948571029485762" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-zinc-200">เบอร์โทรรอง 1 (Co-Leader 1 Phone)</label>
-              <input type="tel" name="coLeader1Phone" placeholder="เช่น 0812345678" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input type="text" name="coLeader1" placeholder="ชื่อรองหัวหน้าคนที่ 1" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
+                <input type="text" name="coLeader1Discord" placeholder="Discord ID" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
+                <input type="tel" name="coLeader1Phone" placeholder="เบอร์โทร" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
+              </div>
             </div>
 
             {/* ─── โซนข้อมูลรองหัวหน้าคนที่ 2 ─── */}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 sm:col-span-2">
               <label className="text-sm font-medium text-zinc-200">รองหัวหน้า 2</label>
-              <input type="text" name="coLeader2" placeholder="ชื่อรองหัวหน้าคนที่ 2" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-zinc-200">เลขดิสคอร์ดรอง 2 (Co-Leader 2 Discord ID)</label>
-              <input type="text" name="coLeader2Discord" placeholder="เช่น 3948571029485763" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-zinc-200">เบอร์โทรรอง 2 (Co-Leader 2 Phone)</label>
-              <input type="tel" name="coLeader2Phone" placeholder="เช่น 0812345678" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input type="text" name="coLeader2" placeholder="ชื่อรองหัวหน้าคนที่ 2" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
+                <input type="text" name="coLeader2Discord" placeholder="Discord ID" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
+                <input type="tel" name="coLeader2Phone" placeholder="เบอร์โทร" className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-blue-400 focus:outline-none text-sm" />
+              </div>
             </div>
 
             {/* ─── โซนผู้อนุมัติแก๊ง ─── */}
