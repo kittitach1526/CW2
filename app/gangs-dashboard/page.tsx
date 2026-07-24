@@ -580,11 +580,9 @@ export default function GangDashboard() {
       return;
     }
 
-    if (isUniformActionNeedOld(uniformForm.actionType)) {
-      if (!uniformForm.colorName || !uniformForm.hexColor) {
-        showStatus({ type: "error", message: "❌ กรุณาใส่ Color และ Hex Color" });
-        return;
-      }
+    if (!uniformForm.colorName || !uniformForm.hexColor) {
+      showStatus({ type: "error", message: "❌ กรุณาใส่ Color และ Hex Color" });
+      return;
     }
 
     if (isUniformActionNeedContract(uniformForm.actionType) && !uniformForm.contractUrl) {
@@ -1644,44 +1642,42 @@ export default function GangDashboard() {
                 ))}
               </div>
 
-              {isUniformActionNeedOld(uniformForm.actionType) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-zinc-200">Color</label>
-                    <input
-                      type="text"
-                      value={uniformForm.colorName}
-                      onChange={(e) => setUniformForm({ ...uniformForm, colorName: e.target.value })}
-                      placeholder="ชื่อสี"
-                      className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-teal-400 focus:outline-none text-sm"
-                      required
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-zinc-200">Hex Color</label>
-                    <div className="relative flex items-center gap-2">
-                      <div className="relative w-11 h-11 rounded-xl border border-white/10 overflow-hidden bg-white/5">
-                        <input
-                          type="color"
-                          value={uniformForm.hexColor}
-                          onChange={(e) => setUniformForm({ ...uniformForm, hexColor: e.target.value })}
-                          className="absolute inset-0 w-full h-full transform scale-150 cursor-pointer bg-transparent border-none p-0"
-                        />
-                      </div>
-                      <div className="relative flex-1">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-zinc-400 font-mono font-bold">#</span>
-                        <input
-                          type="text"
-                          value={uniformForm.hexColor.replace("#", "")}
-                          onChange={(e) => { if (e.target.value.length <= 6) setUniformForm({ ...uniformForm, hexColor: `#${e.target.value}` }); }}
-                          className="w-full h-11 pl-8 pr-4 rounded-xl bg-white/5 border border-white/10 text-sm font-mono uppercase text-white focus:outline-none"
-                          required
-                        />
-                      </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-zinc-200">Color</label>
+                  <input
+                    type="text"
+                    value={uniformForm.colorName}
+                    onChange={(e) => setUniformForm({ ...uniformForm, colorName: e.target.value })}
+                    placeholder="ชื่อสี"
+                    className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-teal-400 focus:outline-none text-sm"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-zinc-200">Hex Color</label>
+                  <div className="relative flex items-center gap-2">
+                    <div className="relative w-11 h-11 rounded-xl border border-white/10 overflow-hidden bg-white/5">
+                      <input
+                        type="color"
+                        value={uniformForm.hexColor}
+                        onChange={(e) => setUniformForm({ ...uniformForm, hexColor: e.target.value })}
+                        className="absolute inset-0 w-full h-full transform scale-150 cursor-pointer bg-transparent border-none p-0"
+                      />
+                    </div>
+                    <div className="relative flex-1">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-zinc-400 font-mono font-bold">#</span>
+                      <input
+                        type="text"
+                        value={uniformForm.hexColor.replace("#", "")}
+                        onChange={(e) => { if (e.target.value.length <= 6) setUniformForm({ ...uniformForm, hexColor: `#${e.target.value}` }); }}
+                        className="w-full h-11 pl-8 pr-4 rounded-xl bg-white/5 border border-white/10 text-sm font-mono uppercase text-white focus:outline-none"
+                        required
+                      />
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
 
               <ImageUpload
                 label={isUniformActionNeedContract(uniformForm.actionType) ? "ลิงก์รูปใบสัญญาสภา (บังคับสำหรับถูกชิงสี)" : "ลิงก์รูปภาพประกอบชุด (ถ้ามี)"}

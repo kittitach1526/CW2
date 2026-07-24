@@ -444,3 +444,80 @@
 2026-07-23 23:34:55.306 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
 2026-07-23 23:34:55.327 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
 2026-07-23 23:34:55.327 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-24 19:09:14.077 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-24 19:09:14.121 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-24 19:09:14.121 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-24 19:09:15.823 | INFO     | __main__:<module>:2302 - 🚀 ระบบ backend กำลังเริ่มต้นการทำงาน
+2026-07-24 19:09:15.838 | INFO     | __main__:<module>:2304 - ✅ เริ่มต้นฐานข้อมูลเสร็จสิ้น
+2026-07-24 19:09:15.839 | INFO     | __main__:<module>:2306 - 🌐 กำลังเปิดพอร์ต 4000
+2026-07-24 19:16:41.325 | INFO     | __main__:log_before_request:28 - ➡️ รับคำขอ POST /api/council/login
+2026-07-24 19:16:41.325 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/council/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}
+2026-07-24 19:16:41.327 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ POST /api/council/login สถานะ 401
+2026-07-24 19:16:41.328 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"message": "❌ รหัสผ่านไม่ถูกต้อง", "success": false}
+2026-07-24 19:16:41.336 | INFO     | __main__:_log_action:465 - 📝 root (system) login เมื่อ 2026-07-24 12:16:41
+2026-07-24 19:16:41.336 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/council/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}, "response_status": 401, "response": {"message": "❌ รหัสผ่านไม่ถูกต้อง", "success": false}}
+2026-07-24 19:16:42.160 | INFO     | __main__:log_before_request:28 - ➡️ รับคำขอ POST /api/council/login
+2026-07-24 19:16:42.160 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/council/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}
+2026-07-24 19:16:42.162 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ POST /api/council/login สถานะ 401
+2026-07-24 19:16:42.162 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"message": "❌ รหัสผ่านไม่ถูกต้อง", "success": false}
+2026-07-24 19:16:42.170 | INFO     | __main__:_log_action:465 - 📝 root (system) login เมื่อ 2026-07-24 12:16:42
+2026-07-24 19:16:42.170 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/council/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}, "response_status": 401, "response": {"message": "❌ รหัสผ่านไม่ถูกต้อง", "success": false}}
+2026-07-24 19:16:46.047 | INFO     | __main__:log_before_request:28 - ➡️ รับคำขอ POST /api/council/login
+2026-07-24 19:16:46.047 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/council/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}
+2026-07-24 19:16:46.050 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ POST /api/council/login สถานะ 200
+2026-07-24 19:16:46.050 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"council": {"createdAt": "2026-07-23 16:07:42", "id": 2132, "name": "Root Council", "password": "***", "status": "อนุมัติ", "username": "root"}, "message": "🎉 เข้าสู่ระบบสภากลางสำเร็จ!", "success": true}
+2026-07-24 19:16:46.058 | INFO     | __main__:_log_action:465 - 📝 root (system) login เมื่อ 2026-07-24 12:16:46
+2026-07-24 19:16:46.058 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/council/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}, "response_status": 200, "response": {"council": {"createdAt": "2026-07-23 16:07:42", "id": 2132, "name": "Root Council", "password": "***", "status": "อนุมัติ", "username": "root"}, "message": "🎉 เข้าสู่ระบบสภากลางสำเร็จ!", "success": true}}
+2026-07-24 19:16:47.138 | INFO     | __main__:log_before_request:28 - ➡️ รับคำขอ POST /api/council/login
+2026-07-24 19:16:47.138 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/council/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}
+2026-07-24 19:16:47.140 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ POST /api/council/login สถานะ 200
+2026-07-24 19:16:47.141 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"council": {"createdAt": "2026-07-23 16:07:42", "id": 2132, "name": "Root Council", "password": "***", "status": "อนุมัติ", "username": "root"}, "message": "🎉 เข้าสู่ระบบสภากลางสำเร็จ!", "success": true}
+2026-07-24 19:16:47.147 | INFO     | __main__:_log_action:465 - 📝 root (system) login เมื่อ 2026-07-24 12:16:47
+2026-07-24 19:16:47.148 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/council/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}, "response_status": 200, "response": {"council": {"createdAt": "2026-07-23 16:07:42", "id": 2132, "name": "Root Council", "password": "***", "status": "อนุมัติ", "username": "root"}, "message": "🎉 เข้าสู่ระบบสภากลางสำเร็จ!", "success": true}}
+2026-07-24 20:01:05.996 | INFO     | __main__:log_before_request:28 - ➡️ รับคำขอ PATCH /api/gangs/1/status
+2026-07-24 20:01:05.998 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "PATCH", "path": "/api/gangs/1/status", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"status": "approved", "actor": "Root Council", "actorRole": "council"}}
+2026-07-24 20:01:06.019 | INFO     | __main__:_log_action:465 - 📝 Root Council (council) อัปเดตสถานะแก๊ง #1 → สถานะ approved เมื่อ 2026-07-24 13:01:06
+2026-07-24 20:01:06.019 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "PATCH", "path": "/api/gangs/1/status", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"status": "approved", "actor": "Root Council", "actorRole": "council"}}, "status": "approved", "actor": "Root Council", "actorRole": "council"}
+2026-07-24 20:01:06.021 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ PATCH /api/gangs/1/status สถานะ 200
+2026-07-24 20:01:06.021 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"message": "🎉 อนุมัติสิทธิ์ภาคีเครือข่ายแก๊งเข้าสู่ระบบสภากลางสำเร็จ!", "success": true}
+2026-07-24 20:01:16.811 | INFO     | __main__:log_before_request:28 - ➡️ รับคำขอ POST /api/frontend-logs
+2026-07-24 20:01:16.812 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/frontend-logs", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"action": "ออกจากระบบ", "actor": "Root Council", "actorRole": "council", "targetType": "council_dashboard", "targetName": "council-dashboard", "details": {}}}
+2026-07-24 20:01:16.821 | INFO     | __main__:_log_action:465 - 📝 Root Council (council) ออกจากระบบ council-dashboard เมื่อ 2026-07-24 13:01:16
+2026-07-24 20:01:16.822 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/frontend-logs", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"action": "ออกจากระบบ", "actor": "Root Council", "actorRole": "council", "targetType": "council_dashboard", "targetName": "council-dashboard", "details": {}}}}
+2026-07-24 20:01:16.824 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ POST /api/frontend-logs สถานะ 201
+2026-07-24 20:01:16.824 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"message": "✅ บันทึก log frontend เรียบร้อย", "success": true}
+2026-07-24 20:01:25.558 | INFO     | __main__:log_before_request:28 - ➡️ รับคำขอ POST /api/gangs/login
+2026-07-24 20:01:25.558 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/gangs/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"abbreviation": "TG1", "password": "***"}}
+2026-07-24 20:01:25.561 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ POST /api/gangs/login สถานะ 200
+2026-07-24 20:01:25.562 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"gang": {"abbreviation": "TG1", "approver": "Approver", "coLeader1": null, "coLeader1Discord": null, "coLeader1Phone": null, "coLeader2": null, "coLeader2Discord": null, "coLeader2Phone": null, "colorTheme": "#3b82f6", "createdAt": "2026-07-16 08:45:17", "editReason": null, "fullName": "Test Gang", "id": 1, "leader": "Leader", "leaderDiscord": "123", "leaderPhone": null, "logoUrl": null, "password": "***", "status": "approved", "type": "Gang"}, "message": "🎉 เข้าสู่ระบบสำเร็จ!", "success": true}
+2026-07-24 20:01:25.569 | INFO     | __main__:_log_action:465 - 📝 TG1 (system) login TG1 เมื่อ 2026-07-24 13:01:25
+2026-07-24 20:01:25.569 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/gangs/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"abbreviation": "TG1", "password": "***"}}, "response_status": 200, "response": {"gang": {"abbreviation": "TG1", "approver": "Approver", "coLeader1": null, "coLeader1Discord": null, "coLeader1Phone": null, "coLeader2": null, "coLeader2Discord": null, "coLeader2Phone": null, "colorTheme": "#3b82f6", "createdAt": "2026-07-16 08:45:17", "editReason": null, "fullName": "Test Gang", "id": 1, "leader": "Leader", "leaderDiscord": "123", "leaderPhone": null, "logoUrl": null, "password": "***", "status": "approved", "type": "Gang"}, "message": "🎉 เข้าสู่ระบบสำเร็จ!", "success": true}}
+2026-07-24 20:17:28.951 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/frontend-logs", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"action": "ออกจากระบบ", "actor": "Test Gang", "actorRole": "gang", "targetType": "gang_dashboard", "targetName": "gang-dashboard", "details": {}}}
+2026-07-24 20:17:28.961 | INFO     | __main__:_log_action:465 - 📝 Test Gang (gang) ออกจากระบบ gang-dashboard เมื่อ 2026-07-24 13:17:28
+2026-07-24 20:17:28.961 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/frontend-logs", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"action": "ออกจากระบบ", "actor": "Test Gang", "actorRole": "gang", "targetType": "gang_dashboard", "targetName": "gang-dashboard", "details": {}}}}
+2026-07-24 20:17:28.962 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ POST /api/frontend-logs สถานะ 201
+2026-07-24 20:17:28.962 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"message": "✅ บันทึก log frontend เรียบร้อย", "success": true}
+2026-07-24 20:17:36.963 | INFO     | __main__:log_before_request:28 - ➡️ รับคำขอ POST /api/admin/login
+2026-07-24 20:17:36.963 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/admin/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}
+2026-07-24 20:17:36.965 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ POST /api/admin/login สถานะ 401
+2026-07-24 20:17:36.965 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"message": "❌ รหัสผ่านไม่ถูกต้อง", "success": false}
+2026-07-24 20:17:36.973 | INFO     | __main__:_log_action:465 - 📝 root (system) login เมื่อ 2026-07-24 13:17:36
+2026-07-24 20:17:36.973 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/admin/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}, "response_status": 401, "response": {"message": "❌ รหัสผ่านไม่ถูกต้อง", "success": false}}
+2026-07-24 20:17:37.721 | INFO     | __main__:log_before_request:28 - ➡️ รับคำขอ POST /api/admin/login
+2026-07-24 20:17:37.722 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/admin/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}
+2026-07-24 20:17:37.725 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ POST /api/admin/login สถานะ 401
+2026-07-24 20:17:37.725 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"message": "❌ รหัสผ่านไม่ถูกต้อง", "success": false}
+2026-07-24 20:17:37.734 | INFO     | __main__:_log_action:465 - 📝 root (system) login เมื่อ 2026-07-24 13:17:37
+2026-07-24 20:17:37.735 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/admin/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}, "response_status": 401, "response": {"message": "❌ รหัสผ่านไม่ถูกต้อง", "success": false}}
+2026-07-24 20:17:41.751 | INFO     | __main__:log_before_request:28 - ➡️ รับคำขอ POST /api/admin/login
+2026-07-24 20:17:41.751 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/admin/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}
+2026-07-24 20:17:41.754 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ POST /api/admin/login สถานะ 200
+2026-07-24 20:17:41.754 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"admin": {"createdAt": "2026-07-23 16:07:42", "id": 168, "name": "Root Admin", "password": "***", "status": "อนุมัติ", "username": "root"}, "message": "🎉 เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!", "success": true}
+2026-07-24 20:17:41.762 | INFO     | __main__:_log_action:465 - 📝 root (system) login เมื่อ 2026-07-24 13:17:41
+2026-07-24 20:17:41.762 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/admin/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}, "response_status": 200, "response": {"admin": {"createdAt": "2026-07-23 16:07:42", "id": 168, "name": "Root Admin", "password": "***", "status": "อนุมัติ", "username": "root"}, "message": "🎉 เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!", "success": true}}
+2026-07-24 20:17:42.567 | INFO     | __main__:log_before_request:28 - ➡️ รับคำขอ POST /api/admin/login
+2026-07-24 20:17:42.567 | INFO     | __main__:log_before_request:29 - 📥 ข้อมูลเข้า: {"method": "POST", "path": "/api/admin/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}
+2026-07-24 20:17:42.570 | INFO     | __main__:log_after_request:48 - ⬅️ ตอบกลับ POST /api/admin/login สถานะ 200
+2026-07-24 20:17:42.570 | INFO     | __main__:log_after_request:50 - 📤 ข้อมูลออก: {"admin": {"createdAt": "2026-07-23 16:07:42", "id": 168, "name": "Root Admin", "password": "***", "status": "อนุมัติ", "username": "root"}, "message": "🎉 เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!", "success": true}
+2026-07-24 20:17:42.578 | INFO     | __main__:_log_action:465 - 📝 root (system) login เมื่อ 2026-07-24 13:17:42
+2026-07-24 20:17:42.578 | INFO     | __main__:_log_action:466 - 📦 รายละเอียด: {"request": {"method": "POST", "path": "/api/admin/login", "query": {}, "remote_addr": "127.0.0.1", "user_agent": null, "data": {"username": "root", "password": "***"}}, "response_status": 200, "response": {"admin": {"createdAt": "2026-07-23 16:07:42", "id": 168, "name": "Root Admin", "password": "***", "status": "อนุมัติ", "username": "root"}, "message": "🎉 เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!", "success": true}}

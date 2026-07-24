@@ -651,7 +651,7 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                         {gangsList.filter(g => g.status === "pending" || g.status === "รอยุบ").length === 0 ? (
                           <tr><td colSpan={4} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มีคำขออนุมัติค้างอยู่ในระบบ</td></tr>
                         ) : (
-                          gangsList.map((gang) => (
+                          gangsList.filter(g => g.status === "pending" || g.status === "รอยุบ").map((gang) => (
                             <tr key={gang.id} className="hover:bg-white/[0.01] transition-colors">
                               <td className="px-6 py-4 font-bold text-white">{gang.fullName} <span className="text-zinc-500 font-mono font-normal">[{gang.abbreviation}]</span></td>
                               <td className="px-6 py-4 text-zinc-400">{gang.leader}</td>

@@ -10,6 +10,7 @@ import {
   updateUniformStatus,
   getLeaveRequests,
   logFrontendAction,
+  getAllGangs,
 } from "../register";
 import { useStatusModal } from "../components/StatusModalProvider";
 
@@ -46,6 +47,13 @@ type UniformFile = {
   reason: string | null;
   status: string;
   createdAt: string;
+  details?: any;
+};
+
+const parseDetails = (raw: any) => {
+  if (!raw) return {};
+  if (typeof raw === "object") return raw;
+  try { return JSON.parse(raw); } catch { return {}; }
 };
 
 export default function AdminDashboard() {
@@ -60,8 +68,9 @@ export default function AdminDashboard() {
   const [welfareRequests, setWelfareRequests] = useState<WelfareRequest[]>([]);
   const [uniformFiles, setUniformFiles] = useState<UniformFile[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<WelfareRequest[]>([]);
+  const [gangs, setGangs] = useState<any[]>([]);
   const [selectedGang, setSelectedGang] = useState<string>("ทั้งหมด");
-  const [selectedOutfitGang, setSelectedOutfitGang] = useState<string>("ทั้งหมด");
+  const [selectedOutfitGang, setSelectedOutfitGang] = useState<string>("");
   const [selectedLeaveGang, setSelectedLeaveGang] = useState<string>("ทั้งหมด");
 
   const filteredWelfareRequests = useMemo(() => {
@@ -73,14 +82,20 @@ export default function AdminDashboard() {
     return ["ทั้งหมด", ...Array.from(new Set(welfareRequests.map((r) => r.gangAbbreviation).filter(Boolean)))];
   }, [welfareRequests]);
 
-  const filteredUniformFiles = useMemo(() => {
-    if (selectedOutfitGang === "ทั้งหมด") return uniformFiles;
-    return uniformFiles.filter((f) => f.gangName === selectedOutfitGang);
-  }, [uniformFiles, selectedOutfitGang]);
-
-  const outfitGangOptions = useMemo(() => {
-    return ["ทั้งหมด", ...Array.from(new Set(uniformFiles.map((f) => f.gangName).filter(Boolean)))];
+  const sortedUniformFiles = useMemo(() => {
+    return [...uniformFiles].sort((a, b) => b.id - a.id);
   }, [uniformFiles]);
+
+  const approvedGangNames = useMemo(() => {
+    return Array.from(new Set(gangs.filter((g) => g.status === "approved").map((g) => g.fullName).filter(Boolean)));
+  }, [gangs]);
+
+  const outfitGangOptions = approvedGangNames;
+
+  const perGangUniformFiles = useMemo(() => {
+    if (!selectedOutfitGang) return [];
+    return sortedUniformFiles.filter((f) => f.gangName === selectedOutfitGang);
+  }, [sortedUniformFiles, selectedOutfitGang]);
 
   const filteredLeaveRequests = useMemo(() => {
     if (selectedLeaveGang === "ทั้งหมด") return leaveRequests;
@@ -111,6 +126,12 @@ export default function AdminDashboard() {
   }, [mounted, adminData, router]);
 
   useEffect(() => {
+    if (approvedGangNames.length > 0 && !selectedOutfitGang) {
+      setSelectedOutfitGang(approvedGangNames[0]);
+    }
+  }, [approvedGangNames, selectedOutfitGang]);
+
+  useEffect(() => {
     if (!adminData) return;
 
     const fetchData = async () => {
@@ -122,8 +143,9 @@ export default function AdminDashboard() {
         }
 
         if (activeTab === "outfit") {
-          const uniformResult = await getAllUniformFiles();
+          const [uniformResult, gangsResult] = await Promise.all([getAllUniformFiles(), getAllGangs()]);
           setUniformFiles(uniformResult.success ? uniformResult.files || [] : []);
+          setGangs(gangsResult.success ? gangsResult.gangs || [] : []);
         }
 
         if (activeTab === "leave") {
@@ -414,90 +436,188 @@ export default function AdminDashboard() {
           )}
 
           {!loading && activeTab === "outfit" && (
-            <div className="overflow-x-auto">
-              <div className="flex flex-col sm:flex-row gap-4 p-4 border-b border-white/10 bg-white/5">
-                <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-                  <span>กรองตามแก๊ง</span>
-                  <select
-                    value={selectedOutfitGang}
-                    onChange={(e) => setSelectedOutfitGang(e.target.value)}
-                    className="h-10 px-3 rounded-xl bg-zinc-950 border border-white/10 text-zinc-200 text-sm focus:outline-none focus:border-purple-400"
-                  >
-                    {outfitGangOptions.map((g) => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                  </select>
-                </label>
-                <span className="text-xs text-zinc-500 flex items-center">แสดง {filteredUniformFiles.length} รายการ</span>
-              </div>
-              <table className="w-full text-xs text-left whitespace-nowrap">
-                <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/10 font-medium">
-                  <tr>
-                    <th className="px-6 py-4">แก๊ง</th>
-                    <th className="px-6 py-4">ประเภทชุด</th>
-                    <th className="px-6 py-4">ลิงก์ไฟล์</th>
-                    <th className="px-6 py-4">เหตุผล</th>
-                    <th className="px-6 py-4">สถานะ</th>
-                    <th className="px-6 py-4 text-center">จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10 text-zinc-300">
-                  {filteredUniformFiles.length === 0 ? (
+            <div className="flex flex-col gap-8">
+              {/* ตารางที่ 1: รวมรายการล่าสุดทุกแก๊ง */}
+              <div className="overflow-x-auto rounded-2xl border border-white/10 bg-zinc-950/40">
+                <div className="p-4 border-b border-white/10 bg-white/5 flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white">📋 รายการไฟล์ชุดล่าสุดทุกแก๊ง</h3>
+                  <span className="text-xs text-zinc-500">แสดง {sortedUniformFiles.length} รายการ</span>
+                </div>
+                <table className="w-full text-xs text-left whitespace-nowrap">
+                  <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/10 font-medium">
                     <tr>
-                      <td colSpan={6} className="text-center py-20 text-zinc-500 font-light tracking-wide">
-                        📭 ไม่มีไฟล์ชุดในระบบ
-                      </td>
+                      <th className="px-6 py-4">แก๊ง</th>
+                      <th className="px-6 py-4">ประเภทชุด</th>
+                      <th className="px-6 py-4">สี</th>
+                      <th className="px-6 py-4">ลิงก์ไฟล์</th>
+                      <th className="px-6 py-4">เหตุผล</th>
+                      <th className="px-6 py-4">สถานะ</th>
+                      <th className="px-6 py-4">เวลายื่น</th>
+                      <th className="px-6 py-4 text-center">จัดการ</th>
                     </tr>
-                  ) : (
-                    filteredUniformFiles.map((file) => (
-                      <tr key={file.id} className="hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4 font-semibold text-white">{file.gangName}</td>
-                        <td className="px-6 py-4 text-zinc-400">{file.uniformType}</td>
-                        <td className="px-6 py-4">
-                          <a
-                            href={file.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-zinc-400 hover:text-white underline underline-offset-4 transition-colors font-medium"
-                          >
-                            📥 ดาวน์โหลด
-                          </a>
-                        </td>
-                        <td className="px-6 py-4 text-zinc-400 max-w-[200px] truncate">{file.reason || "-"}</td>
-                        <td className="px-6 py-4">
-                          <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${
-                            file.status === "ลงแล้ว"
-                              ? "bg-white/10 text-white border-white/20"
-                              : "bg-white/5 text-zinc-400 border-white/10"
-                          }`}>
-                            {file.status === "ลงแล้ว" ? "✓ ลงแล้ว" : "⏳ รอลง"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          {file.status !== "ลงแล้ว" ? (
-                            <div className="flex justify-center gap-2">
-                              <button
-                                onClick={() => handleOutfitAction(file.id, "ลงแล้ว")}
-                                className="px-4 py-1.5 bg-white/10 hover:bg-white hover:text-black font-medium rounded-lg border border-white/10 transition-all text-[11px] shadow-sm"
-                              >
-                                ลงแล้ว
-                              </button>
-                              <button
-                                onClick={() => handleOutfitAction(file.id, "ปฏิเสธ")}
-                                className="px-4 py-1.5 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-white/10 rounded-lg transition-all text-[11px]"
-                              >
-                                ปฏิเสธ
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-zinc-500 text-xs">-</span>
-                          )}
+                  </thead>
+                  <tbody className="divide-y divide-white/10 text-zinc-300">
+                    {sortedUniformFiles.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="text-center py-20 text-zinc-500 font-light tracking-wide">
+                          📭 ไม่มีไฟล์ชุดในระบบ
                         </td>
                       </tr>
-                    ))
+                    ) : (
+                      sortedUniformFiles.map((file) => {
+                        const details = parseDetails(file.details);
+                        return (
+                        <tr key={file.id} className="hover:bg-white/5 transition-colors">
+                          <td className="px-6 py-4 font-semibold text-white">{file.gangName}</td>
+                          <td className="px-6 py-4 text-zinc-400">{file.uniformType}</td>
+                          <td className="px-6 py-4">
+                            {details.colorName ? (
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-md border border-white/10 inline-block" style={{ backgroundColor: details.hexColor || "#3b82f6" }} />
+                                <span className="text-zinc-300">{details.colorName}</span>
+                              </div>
+                            ) : (
+                              <span className="text-zinc-500">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <a
+                              href={file.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-zinc-400 hover:text-white underline underline-offset-4 transition-colors font-medium"
+                            >
+                              📥 ดาวน์โหลด
+                            </a>
+                          </td>
+                          <td className="px-6 py-4 text-zinc-400 max-w-[200px] truncate">{file.reason || "-"}</td>
+                          <td className="px-6 py-4">
+                            <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${
+                              file.status === "ลงแล้ว"
+                                ? "bg-white/10 text-white border-white/20"
+                                : "bg-white/5 text-zinc-400 border-white/10"
+                            }`}>
+                              {file.status === "ลงแล้ว" ? "✓ ลงแล้ว" : "⏳ รอลง"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-zinc-400 text-xs font-mono">{file.createdAt}</td>
+                          <td className="px-6 py-4 text-center">
+                            {file.status !== "ลงแล้ว" ? (
+                              <div className="flex justify-center gap-2">
+                                <button
+                                  onClick={() => handleOutfitAction(file.id, "ลงแล้ว")}
+                                  className="px-4 py-1.5 bg-white/10 hover:bg-white hover:text-black font-medium rounded-lg border border-white/10 transition-all text-[11px] shadow-sm"
+                                >
+                                  ลงแล้ว
+                                </button>
+                                <button
+                                  onClick={() => handleOutfitAction(file.id, "ปฏิเสธ")}
+                                  className="px-4 py-1.5 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-white/10 rounded-lg transition-all text-[11px]"
+                                >
+                                  ปฏิเสธ
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-zinc-500 text-xs">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })
                   )}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* ตารางที่ 2: เลือกดูตามแก๊ง */}
+              <div className="overflow-x-auto rounded-2xl border border-white/10 bg-zinc-950/40">
+                <div className="flex flex-col sm:flex-row gap-4 p-4 border-b border-white/10 bg-white/5 items-start sm:items-center justify-between">
+                  <h3 className="text-sm font-bold text-white">🔎 รายการไฟล์ชุดตามแก๊ง</h3>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                      <span>เลือกแก๊ง</span>
+                      <select
+                        value={selectedOutfitGang}
+                        onChange={(e) => setSelectedOutfitGang(e.target.value)}
+                        className="h-10 px-3 rounded-xl bg-zinc-950 border border-white/10 text-zinc-200 text-sm focus:outline-none focus:border-purple-400"
+                      >
+                        {outfitGangOptions.map((g) => (
+                          <option key={g} value={g}>{g}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <span className="text-xs text-zinc-500">แสดง {perGangUniformFiles.length} รายการ</span>
+                  </div>
+                </div>
+                <table className="w-full text-xs text-left whitespace-nowrap">
+                  <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/10 font-medium">
+                    <tr>
+                      <th className="px-6 py-4">แก๊ง</th>
+                      <th className="px-6 py-4">ประเภทชุด</th>
+                      <th className="px-6 py-4">ลิงก์ไฟล์</th>
+                      <th className="px-6 py-4">เหตุผล</th>
+                      <th className="px-6 py-4">สถานะ</th>
+                      <th className="px-6 py-4 text-center">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10 text-zinc-300">
+                    {perGangUniformFiles.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-20 text-zinc-500 font-light tracking-wide">
+                          📭 ไม่มีไฟล์ชุดของแก๊งนี้
+                        </td>
+                      </tr>
+                    ) : (
+                      perGangUniformFiles.map((file) => (
+                        <tr key={file.id} className="hover:bg-white/5 transition-colors">
+                          <td className="px-6 py-4 font-semibold text-white">{file.gangName}</td>
+                          <td className="px-6 py-4 text-zinc-400">{file.uniformType}</td>
+                          <td className="px-6 py-4">
+                            <a
+                              href={file.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-zinc-400 hover:text-white underline underline-offset-4 transition-colors font-medium"
+                            >
+                              📥 ดาวน์โหลด
+                            </a>
+                          </td>
+                          <td className="px-6 py-4 text-zinc-400 max-w-[200px] truncate">{file.reason || "-"}</td>
+                          <td className="px-6 py-4">
+                            <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md border ${
+                              file.status === "ลงแล้ว"
+                                ? "bg-white/10 text-white border-white/20"
+                                : "bg-white/5 text-zinc-400 border-white/10"
+                            }`}>
+                              {file.status === "ลงแล้ว" ? "✓ ลงแล้ว" : "⏳ รอลง"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {file.status !== "ลงแล้ว" ? (
+                              <div className="flex justify-center gap-2">
+                                <button
+                                  onClick={() => handleOutfitAction(file.id, "ลงแล้ว")}
+                                  className="px-4 py-1.5 bg-white/10 hover:bg-white hover:text-black font-medium rounded-lg border border-white/10 transition-all text-[11px] shadow-sm"
+                                >
+                                  ลงแล้ว
+                                </button>
+                                <button
+                                  onClick={() => handleOutfitAction(file.id, "ปฏิเสธ")}
+                                  className="px-4 py-1.5 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-white/10 rounded-lg transition-all text-[11px]"
+                                >
+                                  ปฏิเสธ
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-zinc-500 text-xs">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
