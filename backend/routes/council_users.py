@@ -1,0 +1,193 @@
+from flask import Blueprint, request, jsonify
+from database import get_db
+from helpers import (
+    logger,
+    now_thai,
+    row_to_dict,
+    _parse_details,
+    _normalize,
+    _active_welfare_for_person,
+    _actor_from_data,
+    _target_name_from_locals,
+    _build_log_description,
+    _log_action,
+    ROOT_USERNAME,
+    ROOT_PASSWORD,
+)
+
+bp = Blueprint("council_users", __name__)
+
+# ---------------------------------------------------------------------------
+# Council Users
+# ---------------------------------------------------------------------------
+@bp.route("/api/council/login", methods=["POST"])
+def login_council():
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password", "")
+    if not username or not password:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        user = db.execute(
+            "SELECT * FROM council_users WHERE username = ?", (username,)
+        ).fetchone()
+        if not user:
+            return jsonify({"success": False, "message": "❌ ไม่พบชื่อผู้ใช้ในระบบ"}), 404
+        if user["password"] != password:
+            return jsonify({"success": False, "message": "❌ รหัสผ่านไม่ถูกต้อง"}), 401
+        if user["status"] == "ระงับใช้งาน":
+            return jsonify({"success": False, "message": "🔒 บัญชีนี้ถูกสภากลางระงับการใช้งานแล้ว"}), 403
+
+        return jsonify({
+            "success": True,
+            "message": "🎉 เข้าสู่ระบบสภากลางสำเร็จ!",
+            "council": row_to_dict(user),
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ฐานข้อมูลระบบสภาขัดข้อง (ดู Terminal)"}), 500
+    finally:
+        db.close()
+
+
+@bp.route("/api/council", methods=["GET"])
+def get_all_council_users():
+    db = get_db()
+    try:
+        rows = db.execute("SELECT * FROM council_users ORDER BY id DESC").fetchall()
+        return jsonify({"success": True, "users": [row_to_dict(r) for r in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "users": [], "message": "❌ ไม่สามารถดึงข้อมูลบัญชีสภาได้"}), 500
+    finally:
+        db.close()
+
+
+@bp.route("/api/council/names", methods=["GET"])
+def get_approved_council_names():
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT DISTINCT name FROM council_users WHERE status = 'อนุมัติ' ORDER BY name"
+        ).fetchall()
+        return jsonify({"success": True, "names": [r["name"] for r in rows]})
+    except Exception as e:
+        return jsonify({"success": False, "names": [], "message": "❌ ไม่สามารถดึงรายชื่อสภาได้"}), 500
+    finally:
+        db.close()
+
+
+@bp.route("/api/council", methods=["POST"])
+def create_council_user():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    username = (data.get("username") or "").strip()
+    password = data.get("password", "")
+    if not name or not username or not password:
+        return jsonify({"success": False, "message": "❌ กรุณากรอกข้อมูลให้ครบถ้วน"}), 400
+
+    db = get_db()
+    try:
+        existing = db.execute(
+            "SELECT id FROM council_users WHERE username = ?", (username,)
+        ).fetchone()
+        if existing:
+            return jsonify({"success": False, "message": "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบสภาแล้ว"}), 409
+
+        existing_name = db.execute(
+            "SELECT id FROM council_users WHERE name = ?", (name,)
+        ).fetchone()
+        if existing_name:
+            return jsonify({"success": False, "message": "❌ ชื่อนี้มีอยู่ในระบบสภาแล้ว"}), 409
+
+        db.execute(
+            "INSERT INTO council_users (name, username, password, status, createdAt) VALUES (?, ?, ?, 'อนุมัติ', ?)",
+            (name, username, password, now_thai()),
+        )
+        db.commit()
+        _log_action(db)
+        return jsonify({"success": True, "message": "✅ เพิ่มบัญชีสภากลางเรียบร้อยแล้ว"}), 201
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถเพิ่มบัญชีสภากลางได้"}), 500
+    finally:
+        db.close()
+
+
+@bp.route("/api/council/<int:id>/status", methods=["PATCH"])
+def update_council_user_status(id):
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    db = get_db()
+    try:
+        db.execute("UPDATE council_users SET status = ? WHERE id = ?", (status, id))
+        db.commit()
+        _log_action(db)
+        msg = "✅ เปิดใช้งานบัญชีสภาแล้ว" if status == "อนุมัติ" else "🔒 ระงับการใช้งานบัญชีสภาแล้ว"
+        return jsonify({"success": True, "message": msg})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตสถานะบัญชีสภาได้"}), 500
+    finally:
+        db.close()
+
+
+@bp.route("/api/council/<int:id>", methods=["DELETE"])
+def delete_council_user(id):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM council_users WHERE id = ?", (id,))
+        db.commit()
+        _log_action(db)
+        return jsonify({"success": True, "message": "🗑️ ลบบัญชีสภาเรียบร้อยแล้ว"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถลบบัญชีสภาได้"}), 500
+    finally:
+        db.close()
+
+
+@bp.route("/api/council/<int:id>", methods=["PATCH"])
+def update_council_user(id):
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    username = (data.get("username") or "").strip()
+    password = data.get("password", "")
+    status = data.get("status")
+    db = get_db()
+    try:
+        existing = db.execute("SELECT * FROM council_users WHERE id = ?", (id,)).fetchone()
+        if not existing:
+            return jsonify({"success": False, "message": "❌ ไม่พบบัญชีสภา"}), 404
+        if username and username != existing["username"]:
+            dup = db.execute("SELECT id FROM council_users WHERE username = ? AND id != ?", (username, id)).fetchone()
+            if dup:
+                return jsonify({"success": False, "message": "❌ ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว"}), 409
+        if name and name != existing["name"]:
+            dup_name = db.execute("SELECT id FROM council_users WHERE name = ? AND id != ?", (name, id)).fetchone()
+            if dup_name:
+                return jsonify({"success": False, "message": "❌ ชื่อนี้มีอยู่ในระบบสภาแล้ว"}), 409
+        fields = []
+        values = []
+        if name:
+            fields.append("name = ?")
+            values.append(name)
+        if username:
+            fields.append("username = ?")
+            values.append(username)
+        if password:
+            fields.append("password = ?")
+            values.append(password)
+        if status:
+            fields.append("status = ?")
+            values.append(status)
+        if not fields:
+            return jsonify({"success": False, "message": "❌ ไม่มีข้อมูลที่จะอัปเดต"}), 400
+        values.append(id)
+        db.execute(f"UPDATE council_users SET {', '.join(fields)} WHERE id = ?", values)
+        db.commit()
+        _log_action(db)
+        return jsonify({"success": True, "message": "✅ อัปเดตบัญชีสภาเรียบร้อยแล้ว"})
+    except Exception as e:
+        return jsonify({"success": False, "message": "❌ ไม่สามารถอัปเดตบัญชีสภาได้"}), 500
+    finally:
+        db.close()
+
+

@@ -300,33 +300,6 @@ export async function getLeaveRequests() {
   return result;
 }
 
-export async function getSystemLogs(limit = 500) {
-  return apiFetch("GET", `/api/logs?limit=${limit}`);
-}
-
-export async function logFrontendAction(
-  action: string,
-  targetName?: string,
-  details?: Record<string, unknown>,
-  actor?: string,
-  actorRole?: string,
-  targetType?: string
-) {
-  try {
-    return apiFetch("POST", "/api/frontend-logs", {
-      action,
-      actor: actor || "anonymous",
-      actorRole: actorRole || "user",
-      targetType: targetType || "frontend",
-      targetName,
-      details: details || {},
-    });
-  } catch (error) {
-    console.error("Frontend log error:", error);
-    return { success: false };
-  }
-}
-
 export async function getWelfareItems() {
   return apiFetch("GET", "/api/welfare-items");
 }

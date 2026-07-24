@@ -60,7 +60,7 @@ export default function Home() {
             </div>
             <div>
               <h3 className="text-lg font-bold">Register</h3>
-              <p className="text-xs text-zinc-300/80 mt-1 font-light">สำหรับประชาชนและบุคคลทั่วไปเพื่อรับบริการ</p>
+              <p className="text-xs text-zinc-300/80 mt-1 font-light">ลงทะเบียนแก๊งหรือครอบครัวเพื่อเริ่มใช้งานระบบ</p>
             </div>
           </Link>
 
@@ -75,8 +75,8 @@ export default function Home() {
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-bold">Edit</h3>
-              <p className="text-xs text-zinc-300/80 mt-1 font-light">สำหรับเจ้าหน้าที่และหน่วยงานภายในระบบ</p>
+              <h3 className="text-lg font-bold">Login</h3>
+              <p className="text-xs text-zinc-300/80 mt-1 font-light">ยืนยันตัวตนเข้าสู่ระบบ เพื่อจัดการธุรกรรมและส่งไฟล์เสื้อผ้า</p>
             </div>
           </Link>
 

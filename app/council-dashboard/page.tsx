@@ -8,7 +8,6 @@ import {
   getAllGangs,
   getAllWelfareRequests,
   getLeaveRequests,
-  getSystemLogs,
   updateGangStatus,
   updateWelfareStatus,
   getPendingGangEditRequests,
@@ -27,7 +26,6 @@ import {
   deleteWelfareItem,
   getWelfareItemGangLimits,
   updateWelfareItemGangLimits,
-  logFrontendAction,
 } from "../register";
 import Modal from "../components/Modal";
 import { useStatusModal } from "../components/StatusModalProvider";
@@ -38,7 +36,7 @@ export default function CouncilAdminDashboard() {
   const [adminData, setAdminData] = useState<any>(null);
   const currentActor = adminData?.name || adminData?.username || "สภากลาง";
   const currentActorRole = adminData?.role || "council";
-  const [activeTab, setActiveTab] = useState<"approve_gang" | "approve_welfare" | "approve_leave" | "approve_uniform" | "approve_gang_edit" | "approve_disband" | "approve_pause" | "gang_list" | "rejected_gangs" | "welfare_by_gang" | "welfare_items" | "approve_logs">("approve_gang");
+  const [activeTab, setActiveTab] = useState<"approve_gang" | "approve_welfare" | "approve_leave" | "approve_uniform" | "approve_gang_edit" | "approve_disband" | "approve_pause" | "gang_list" | "rejected_gangs" | "welfare_by_gang" | "welfare_items">("approve_gang");
   const [loading, setLoading] = useState(false);
   const [selectedGangAbbr, setSelectedGangAbbr] = useState("");
   
@@ -51,7 +49,6 @@ export default function CouncilAdminDashboard() {
   const [disbandRequests, setDisbandRequests] = useState<any[]>([]);
   const [pauseRequests, setPauseRequests] = useState<any[]>([]);
   const [welfareItems, setWelfareItems] = useState<any[]>([]);
-  const [systemLogs, setSystemLogs] = useState<any[]>([]);
   const [welfareItemName, setWelfareItemName] = useState("");
   const [welfareItemType, setWelfareItemType] = useState("");
   const [welfareItemGangLimit, setWelfareItemGangLimit] = useState("");
@@ -157,15 +154,6 @@ export default function CouncilAdminDashboard() {
           }
         }
 
-        if (activeTab === "approve_logs") {
-          const result = await getSystemLogs();
-          if (result.success) {
-            setSystemLogs(result.logs || []);
-          } else {
-            setSystemLogs([]);
-          }
-        }
-
       } catch (error) {
         console.error("🚨 ระบบหลังบ้านขัดข้อง:", error);
       } finally {
@@ -177,7 +165,6 @@ export default function CouncilAdminDashboard() {
   }, [activeTab]);
 
   const handleLogout = () => {
-    logFrontendAction("ออกจากระบบ", "council-dashboard", undefined, currentActor, currentActorRole, "council_dashboard");
     localStorage.removeItem("currentCouncil");
     router.push("/");
   };
@@ -498,7 +485,6 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
     { id: "rejected_gangs", label: "แก๊งไม่ได้รับอนุมัติ", icon: "❌" },
     { id: "welfare_by_gang", label: "สวัสดิการตามแก๊ง", icon: "🎁" },
     { id: "welfare_items", label: "จัดการรายการสวัสดิการ", icon: "📦" },
-    { id: "approve_logs", label: "ประวัติการกระทำ", icon: "📝" },
   ] as const;
 
   const pendingGangCount = gangsList.filter((g) => g.status === "pending" || g.status === "รอยุบ").length;
@@ -1470,63 +1456,6 @@ if (!adminData) return <div className="text-zinc-500 text-center mt-20 font-ligh
                   </div>
                 </div>
               )}
-
-              {/* MENU 10: Logs */}
-              {activeTab === "approve_logs" && (
-                <div className="flex flex-col w-full">
-                  <div className="p-5 border-b border-white/[0.06] bg-white/[0.01] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <h2 className="text-xs font-semibold tracking-wider text-zinc-400 uppercase">📝 ประวัติการกระทำ</h2>
-                    <span className="text-xs text-zinc-500">แสดง {systemLogs.length} รายการ</span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-zinc-950/40 text-zinc-400 border-b border-white/[0.06]">
-                        <tr>
-                          <th className="px-6 py-4 w-40">เวลา</th>
-                          <th className="px-6 py-4 w-40">ผู้กระทำ</th>
-                          <th className="px-6 py-4">รายละเอียดการกระทำ</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/[0.04] text-zinc-300">
-                        {systemLogs.length === 0 ? (
-                          <tr><td colSpan={3} className="text-center py-20 text-zinc-600 font-light tracking-wide">📭 ไม่มี log ในระบบ</td></tr>
-                        ) : (
-                          systemLogs.map((log) => (
-                            <tr key={log.id} className="hover:bg-white/[0.01] transition-colors">
-                              <td className="px-6 py-4 text-zinc-400 align-top">{new Date(log.createdAt).toLocaleString("th-TH")}</td>
-                              <td className="px-6 py-4 align-top">
-                                <div className="font-medium text-white">{log.actor || "-"}</div>
-                                <div className="text-[10px] text-zinc-500 mt-0.5">{log.actorRole || "-"}</div>
-                              </td>
-                              <td className="px-6 py-4 text-zinc-300 align-top">
-                                <div className="mb-1">{log.description || `${log.action} ${log.targetType || ""} ${log.targetId ? `#${log.targetId}` : ""}`.trim()}</div>
-                                {log.details && typeof log.details === "object" && (
-                                  <div className="text-[10px] text-zinc-500 mt-1 font-mono">
-                                    {log.details.request && (
-                                      <span className="inline-block mr-3">
-                                        {log.details.request.method} {log.details.request.path}
-                                      </span>
-                                    )}
-                                    {log.details.response_status !== undefined && (
-                                      <span className="inline-block mr-3">สถานะ {log.details.response_status}</span>
-                                    )}
-                                  </div>
-                                )}
-                                {log.details && (
-                                  <pre className="text-[10px] text-zinc-500 mt-1 font-mono bg-zinc-950/30 p-2 rounded max-h-32 overflow-auto max-w-2xl">
-{JSON.stringify(log.details, null, 2)}
-                                  </pre>
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
             </div>
           )}
           </div>

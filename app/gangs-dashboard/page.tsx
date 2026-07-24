@@ -17,7 +17,6 @@ import {
   getPauseRequestByGang,
   getCouncilNames,
   getWelfareItems,
-  logFrontendAction,
 } from "../register";
 import ImageUpload from "../components/ImageUpload";
 import { useStatusModal } from "../components/StatusModalProvider";
@@ -299,10 +298,6 @@ export default function GangDashboard() {
   }, [gangData?.id]);
 
   const handleLogout = () => {
-    if (gangData) {
-      const actor = gangData.fullName || gangData.abbreviation || "แก๊ง";
-      logFrontendAction("ออกจากระบบ", "gang-dashboard", undefined, actor, "gang", "gang_dashboard");
-    }
     localStorage.removeItem("currentGang");
     router.push("/");
   };

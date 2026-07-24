@@ -60,7 +60,7 @@ export default function Home() {
             </div>
             <div>
               <h3 className="text-lg font-bold">Gang / Family</h3>
-              <p className="text-xs text-zinc-300/80 mt-1 font-light">สำหรับประชาชนและบุคคลทั่วไปเพื่อรับบริการ</p>
+              <p className="text-xs text-zinc-300/80 mt-1 font-light">สำหรับแก๊งหรือครอบครัว</p>
             </div>
           </Link>
 
@@ -76,7 +76,7 @@ export default function Home() {
             </div>
             <div>
               <h3 className="text-lg font-bold">Council</h3>
-              <p className="text-xs text-zinc-300/80 mt-1 font-light">สำหรับเจ้าหน้าที่และหน่วยงานภายในระบบ</p>
+              <p className="text-xs text-zinc-300/80 mt-1 font-light">สำหรับหน่วยงานสภา</p>
             </div>
           </Link>
 
@@ -92,7 +92,7 @@ export default function Home() {
             </div>
             <div>
               <h3 className="text-lg font-bold">Admin</h3>
-              <p className="text-xs text-zinc-300/80 mt-1 font-light">สำหรับผู้ดูแลระบบและจัดการโครงสร้างทั้งหมด</p>
+              <p className="text-xs text-zinc-300/80 mt-1 font-light">สำหรับ Admin</p>
             </div>
           </Link>
 
